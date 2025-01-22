@@ -26,3 +26,7 @@ platformer/x32/*
 
 #vs folder
 platformer/.vs/*
+
+#exclude build directories
+platformer/platformer/*
+platformer/build/*
