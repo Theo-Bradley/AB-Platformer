@@ -1,5 +1,8 @@
 #include "SDL3/SDL_main.h"
 #include "SDL3/SDL.h"
+#include "GL/glew.h"
+#include "SDL3/SDL_opengl.h"
+
 
 #ifdef _WIN32
 #define exit(code) exit(##code##)
@@ -9,6 +12,7 @@ int quit(int code);
 
 
 SDL_Window* window;
+SDL_GLContext glContext;
 
 void KeyDown(SDL_KeyboardEvent key)
 {

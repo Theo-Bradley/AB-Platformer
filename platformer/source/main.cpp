@@ -45,6 +45,16 @@ int init()
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4); //use OpenGL 4.x
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5); //use OpenGL x.5
 	window = SDL_CreateWindow("Platformer", 1920, 1080, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
+	SDL_GLContext glContext = SDL_GL_CreateContext(window); //Create GL context
+	if (!glContext) //if failed to create context
+		quit(-1);
+	GLenum glew = glewInit();
+	if (glew != GLEW_OK)
+		quit(-1);
+
+	glClearColor(0.f, 1.f, 0.f, 1.f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	SDL_GL_SwapWindow(window);
 	return 0;
 }
 
