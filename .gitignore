@@ -19,3 +19,7 @@
 *.exe
 *.out
 *.app
+
+#pointless build log files
+platformer/x64/*
+platformer/x32/*
