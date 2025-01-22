@@ -23,3 +23,6 @@
 #pointless build log files
 platformer/x64/*
 platformer/x32/*
+
+#vs folder
+platformer/.vs/*
