@@ -21,6 +21,7 @@ unsigned int planeIndices[6] = {
 
 GLObject* testObj;
 Shader* testShader;
+File* testFile;
 
 int main(int argc, char** argv)
 {
@@ -28,7 +29,8 @@ int main(int argc, char** argv)
 	init();
 
 	testObj = new GLObject(plane, sizeof(plane), planeIndices, sizeof(planeIndices));
-	testShader = new Shader();
+	testShader = new Shader(Path("error.vert").c_str(), Path("error.frag").c_str());
+	//testFile = new File(Path("error.vert").c_str());
 
 	while (running)
 	{
@@ -99,9 +101,8 @@ void Draw()
 	while ((err = glGetError()) != GL_NO_ERROR)
 	{
 		std::cout << std::hex << err << "\n";
+		std::cout << std::dec << std::endl;
 	}
-
-	std::cout << std::dec << std::endl;
 
 	SDL_GL_SwapWindow(window);
 }

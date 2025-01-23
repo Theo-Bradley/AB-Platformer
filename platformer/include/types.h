@@ -3,11 +3,15 @@
 #include "GL/glew.h"
 #include "SDL3/SDL_opengl.h"
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 
 #ifdef _WIN32
 #define exit(code) exit(##code##)
 #endif
+
+#define Path(asset) std::string(SDL_GetBasePath() + std::string("assets\\") +std::string(##asset##))
 
 const char* errorVert = { "#version 450 core\n"
 "layout(location = 0) in vec3 position;\n"
@@ -29,6 +33,48 @@ int quit(int code);
 
 SDL_Window* window;
 SDL_GLContext glContext;
+
+class File
+{
+protected:
+	char* data = nullptr;
+	unsigned long long int size;
+
+public:
+	File(const char* path)
+	{
+		std::filesystem::path filePath{ path }; //create a std::filesystem::path
+		size = std::filesystem::file_size(filePath); //properly get the size of the file
+		if (size == 0) //if file is empty
+			return; //exit
+		std::fstream fileStream; //create the fstream
+		fileStream.open(path, std::ios::in | std::ios::binary); //load file to read as binary
+		data = new char[size]; //create string to hold source
+		fileStream.read(data, size); //load file
+		data[size] = '\0'; //make sure eof is null terminated (useful for loading text files)
+		fileStream.close(); //close file
+	}
+
+	~File()
+	{
+		delete[] data; //delete data
+	}
+
+	const char* const* GetDataPointer()
+	{
+		return &data;
+	}
+
+	const char* GetData()
+	{
+		return data;
+	}
+
+	unsigned long long int GetSize()
+	{
+		return size;
+	};
+};
 
 class GLBuffer
 {
@@ -115,8 +161,8 @@ public:
 		glBindVertexArray(object);
 		if (indexBuffer != nullptr)
 			glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (void*)0); //draw mode, count, typeof index, offset
-		//else //if not using vertex indices
-			//glDrawArrays(GL_TRIANGLES, 0, triCount); //regular draw
+		else //if not using vertex indices
+			glDrawArrays(GL_TRIANGLES, 0, triCount); //regular draw
 		glBindVertexArray(0);
 	}
 };
@@ -127,13 +173,15 @@ protected:
 	GLuint program = 0;
 
 public:
-	Shader()
+	Shader(const char* vertexPath, const char* fragmentPath)
 	{
+		File* vertexFile = new File(vertexPath);
+		File* fragmentFile = new File(fragmentPath);
 		GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER); //init empty shader
 		GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); //..
-		glShaderSource(vertexShader, 1, &errorVert, NULL); //load shader source
+		glShaderSource(vertexShader, 1, vertexFile->GetDataPointer(), NULL); //load shader source
 		glCompileShader(vertexShader); //compile shader source
-		glShaderSource(fragmentShader, 1, &errorFrag, NULL); //..
+		glShaderSource(fragmentShader, 1, fragmentFile->GetDataPointer(), NULL); //..
 		glCompileShader(fragmentShader); //..
 
 		program = glCreateProgram(); //init empty program
@@ -164,16 +212,15 @@ public:
 		glDeleteShader(fragmentShader); //..
 	}
 
+	Shader()
+	{
+		program = 0;
+	}
+
 	GLuint GetProgram()
 	{
 		return program;
 	}
-
-		/*Shader()
-		{
-			program = 0;
-			isLoaded = false;
-		}*/
 
 		/*Shader(const char* _vertPath, const char* _fragPath)
 		{
