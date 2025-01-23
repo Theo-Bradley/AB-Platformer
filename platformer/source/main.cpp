@@ -30,7 +30,6 @@ int main(int argc, char** argv)
 
 	testObj = new GLObject(plane, sizeof(plane), planeIndices, sizeof(planeIndices));
 	testShader = new Shader(Path("error.vert").c_str(), Path("error.frag").c_str());
-	//testFile = new File(Path("error.vert").c_str());
 
 	while (running)
 	{
@@ -78,6 +77,8 @@ int init()
 	GLenum glew = glewInit(); //init glew
 	if (glew != GLEW_OK) //if glew didn't work
 		quit(-1); //close
+
+	errorShader = new Shader(true);
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT);

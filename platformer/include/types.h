@@ -31,8 +31,11 @@ const char* errorFrag = { "#version 450 core\n"
 
 int quit(int code);
 
+class Shader;
+
 SDL_Window* window;
 SDL_GLContext glContext;
+Shader* errorShader = nullptr;
 
 class File
 {
@@ -196,6 +199,8 @@ public:
 		if (logSize > 0)
 		{
 			std::cout << "Vertex Errors:\n" << log << "\n";
+			if (errorShader != nullptr)
+				program = errorShader->GetProgram();
 		}
 		delete[] log;
 
@@ -205,6 +210,8 @@ public:
 		if (logSize > 0)
 		{
 			std::cout << "Fragment Errors:\n" << log << "\n";
+			if (errorShader != nullptr)
+				program = errorShader->GetProgram();
 		}
 		delete[] log;
 
@@ -212,9 +219,40 @@ public:
 		glDeleteShader(fragmentShader); //..
 	}
 
+	Shader(bool isErrorShader)
+	{
+		if (isErrorShader)
+		{
+			GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER); //init empty shader
+			GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); //..
+			glShaderSource(vertexShader, 1, &errorVert, NULL); //load shader source
+			glCompileShader(vertexShader); //compile shader source
+			glShaderSource(fragmentShader, 1, &errorFrag, NULL); //..
+			glCompileShader(fragmentShader); //..
+
+			program = glCreateProgram(); //init empty program
+			glAttachShader(program, vertexShader); //attach shaders
+			glAttachShader(program, fragmentShader); //..
+			glLinkProgram(program); //link program
+
+			glDeleteShader(vertexShader); //cleanup shaders as they are contained in the program
+			glDeleteShader(fragmentShader); //..
+		}
+		else
+		{
+			if (errorShader != nullptr) //if error shader exists
+				program = errorShader->GetProgram(); //set our program to the error shader
+			else
+				program = 0; //set program to 0 to prevent OpenGL errors
+		}
+	}
+
 	Shader()
 	{
-		program = 0;
+		if (errorShader != nullptr) //if error shader exists
+			program = errorShader->GetProgram(); //set our program to the error shader
+		else
+			program = 0; //set program to 0 to prevent OpenGL errors
 	}
 
 	GLuint GetProgram()
@@ -222,82 +260,16 @@ public:
 		return program;
 	}
 
-		/*Shader(const char* _vertPath, const char* _fragPath)
+	~Shader()
+	{
+		if (this != errorShader && errorShader != nullptr) //if we aren't deleting the error shader and the error shader exists
 		{
-			LoadShaderFromFile(_vertPath, _fragPath);
+			if (program == errorShader->GetProgram()) //if this program is not the error shader 
+				glDeleteProgram(program); //we can delete our program
 		}
-
-		Shader(std::string _vertPath, std::string _fragPath)
-		{
-			LoadShaderFromFile(_vertPath.c_str(), _fragPath.c_str());
-		}*/
-
-		/*bool LoadShaderFromFile(const char* vertPath, const char* fragPath)
-		{
-			//load source from file
-			std::ifstream file;
-			std::string currLine;
-			file.open(vertPath, std::ios::in); //load file to read as binary at the end
-			std::string vertSource; //create string to hold source
-			while (std::getline(file, currLine)) //load file
-			{
-				vertSource.append(currLine); //write in each line
-				vertSource.append("\n"); //append the newline that got eaten by getline
-			}
-			file.close(); //close file
-			file.open(fragPath, std::ios::in); //..
-			std::string fragSource; //..
-			while (std::getline(file, currLine)) //load file
-			{
-				fragSource.append(currLine); //..
-				fragSource.append("\n"); //..
-			}
-			file.close(); //..
-
-			const char* cstrVertSource = vertSource.c_str(); //store the c string for 
-			const char* cstrFragSource = fragSource.c_str();
-
-			GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER); //init empty shader
-			GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); //..
-			glShaderSource(vertexShader, 1, &cstrVertSource, NULL); //load shader source
-			glCompileShader(vertexShader); //compile shader source
-			glShaderSource(fragmentShader, 1, &cstrFragSource, NULL); //..
-			glCompileShader(fragmentShader); //..
-
-			GLint compStatus = GL_FALSE; //init
-			glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &compStatus); //get GL_LINK_STATUS
-
-			/*Get shader errors
-			int logsize;
-			char* log = new char[4096];
-			glGetShaderInfoLog(fragmentShader, 4096, &logsize, log);
-			if (logsize > 0)
-				bool breakHere = true; //*/
-			/*program = glCreateProgram(); //init empty program
-			glAttachShader(program, vertexShader); //attach shaders
-			glAttachShader(program, fragmentShader); //..
-			glLinkProgram(program); //link program
-
-			GLint linkStatus = GL_FALSE; //init
-			glGetProgramiv(program, GL_LINK_STATUS, &linkStatus); //get GL_LINK_STATUS
-			if (linkStatus == GL_FALSE) //if linking failed
-			{
-				program = errShader; //use the error shader
-			}
-
-			glDeleteShader(vertexShader); //cleanup shaders as they are contained in the program
-			glDeleteShader(fragmentShader); //..
-
-			isLoaded = true; //loaded shader
-
-			return !(program == errShader); //return true if succeeded, false if the program is the errShader (failed)
-		}
-
-		~Shader()
-		{
-			if (isLoaded)
-				glDeleteProgram(program);
-		}*/
+		else //if we are the error shader or the error shader doesn't exist
+			glDeleteProgram(program); //we can delete our program
+	}
 };
 
 void KeyDown(SDL_KeyboardEvent key)
