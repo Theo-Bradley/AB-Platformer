@@ -2,14 +2,39 @@
 
 int init();
 void HandleEvents();
+void Draw();
+
+float plane[] = {
+	-0.5f, -0.5f, 0.0f,
+	0.0f, 0.0f,
+	0.5f, -0.5f, 0.0f,
+	1.0f, 0.0f,
+	0.5f, 0.5f, 0.0f,
+	1.0f, 1.0f,
+	-0.5f, 0.5f, 0.0f,
+	0.0f, 1.0f };
+
+unsigned int planeIndices[6] = {
+	0, 1, 2,
+	2, 3, 0
+};
+
+GLObject* testObj;
+Shader* testShader;
 
 int main(int argc, char** argv)
 {
 	bool running = true;
 	init();
+
+	testObj = new GLObject(plane, sizeof(plane), planeIndices, sizeof(planeIndices));
+	testShader = new Shader();
+
 	while (running)
 	{
 		HandleEvents();
+
+		Draw();
 	}
 	return quit(0);
 }
@@ -62,4 +87,21 @@ int quit(int code)
 {
 	SDL_Quit();
 	exit(code);
+}
+
+void Draw()
+{
+	glClear(GL_COLOR_BUFFER_BIT); //clear frame buffer
+
+	glUseProgram(testShader->GetProgram());
+	testObj->Draw();
+	GLenum err;
+	while ((err = glGetError()) != GL_NO_ERROR)
+	{
+		std::cout << std::hex << err << "\n";
+	}
+
+	std::cout << std::dec << std::endl;
+
+	SDL_GL_SwapWindow(window);
 }
