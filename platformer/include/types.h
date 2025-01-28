@@ -8,7 +8,9 @@
 #include "glm/glm.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "PhysX/PxPhysicsAPI.h"
 
+using namespace physx;
 
 #ifdef _WIN32
 #define exit(code) exit(##code##)
@@ -37,10 +39,42 @@ int quit(int code);
 class Shader;
 class Camera;
 
+class PhysicsErrorCallback : public PxErrorCallback
+{
+public:
+	virtual void reportError(PxErrorCode::Enum code, const char* message, const char* file, int line)
+	{
+		// error processing implementation
+		std::cout << std::dec << "PhysX Error: " << code << ": " << message << " in " << file << " at " << line << "\n";
+		switch (code)
+		{
+		case PxErrorCode::eABORT:
+			exit(-1);
+		case PxErrorCode::eINTERNAL_ERROR:
+			exit(-1);
+		case PxErrorCode::eOUT_OF_MEMORY:
+			exit(-1);
+		case PxErrorCode::eINVALID_OPERATION:
+			exit(-2);
+		case PxErrorCode::eINVALID_PARAMETER:
+			exit(-2);
+		}
+	}
+};
+
 SDL_Window* window;
 SDL_GLContext glContext;
 Shader* errorShader = nullptr;
 Camera* mainCamera;
+PxDefaultAllocator pAlloc;
+PhysicsErrorCallback pError;
+PxFoundation* pFoundation;
+PxPhysics* pPhysics;
+PxDefaultCpuDispatcher* pDispatcher;
+PxScene* pScene;
+PxMaterial* pMaterial;
+PxPvd* pPvd;
+unsigned long long int eTime = 0;
 
 float screenWidth, screenHeight;
 

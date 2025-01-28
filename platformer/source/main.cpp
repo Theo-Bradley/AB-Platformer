@@ -78,7 +78,12 @@ int main(int argc, char** argv)
 
 	while (running)
 	{
+		unsigned long long oldETime = eTime;
+		eTime = SDL_GetTicks();
+		unsigned long long dTime = eTime - oldETime;
 		HandleEvents();
+		pScene->simulate(1000.00f / dTime); //simulate by delta time
+		pScene->fetchResults(true); //wait for results
 
 		Draw();
 	}
@@ -124,6 +129,21 @@ int init()
 	GLenum glew = glewInit(); //init glew
 	if (glew != GLEW_OK) //if glew didn't work
 		quit(-1); //close
+	eTime = SDL_GetTicks();
+
+	pFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, pAlloc, pError);
+	pPvd = PxCreatePvd(*pFoundation);
+	PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10);
+	pPvd->connect(*transport, PxPvdInstrumentationFlag::eALL);
+
+	pPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *pFoundation, physx::PxTolerancesScale(), true, pPvd);
+
+	PxSceneDesc sceneDesc(pPhysics->getTolerancesScale());
+	sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f);
+	pDispatcher = PxDefaultCpuDispatcherCreate(2);
+	sceneDesc.cpuDispatcher = pDispatcher;
+	sceneDesc.filterShader = PxDefaultSimulationFilterShader;
+	pScene = pPhysics->createScene(sceneDesc);
 
 	errorShader = new Shader(true);
 	errorShader->Use();
@@ -140,6 +160,10 @@ int init()
 int quit(int code)
 {
 	SDL_Quit();
+	if (pPhysics != nullptr)
+		pPhysics->release();
+	if (pFoundation != nullptr)
+		pFoundation->release();
 	exit(code);
 }
 
