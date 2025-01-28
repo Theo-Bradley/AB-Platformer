@@ -6,6 +6,8 @@
 #include <fstream>
 #include <filesystem>
 #include "glm/glm.hpp"
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 
 #ifdef _WIN32
@@ -33,14 +35,51 @@ const char* errorFrag = { "#version 450 core\n"
 int quit(int code);
 
 class Shader;
+class Camera;
 
 SDL_Window* window;
 SDL_GLContext glContext;
 Shader* errorShader = nullptr;
+Camera* mainCamera;
+
+float screenWidth, screenHeight;
 
 class Camera
 {
-	
+protected:
+	float angle;
+	float height;
+	float distance;
+	glm::mat4 view;
+	glm::mat4 projection;
+
+	glm::mat4 LookAt(glm::vec3 target)
+	{
+		//sin(theta) z coord
+		//cos(theta) x coord
+		glm::vec3 cameraPos = glm::vec3(distance * glm::cos(angle), height, distance * -glm::sin(angle));
+		return glm::lookAt(target + cameraPos, target, glm::vec3(0.00f, 1.00f, 0.00f));
+	}
+
+	glm::mat4 Project()
+	{
+		return glm::perspective(glm::radians(45.f), screenWidth/screenHeight, 0.01f, 10.00f);
+	}
+
+public:
+	Camera(glm::vec3 _target, float _angle, float _height)
+	{
+		angle = _angle;
+		height = _height;
+		distance = 2.00f;
+		view = LookAt(_target);
+		projection = Project();
+	}
+
+	glm::mat4 GetCombinedMatrix()
+	{
+		return projection * view;
+	}
 };
 
 class File
@@ -129,7 +168,7 @@ public:
 	{
 		attribBuffer = new GLBuffer(attribData, size); //create vertex attribute buffer
 		indexBuffer = nullptr; //no index buffer
-		triCount = size / sizeof(float);
+		triCount = size / (sizeof(float) * 5); //number of tris in buffer (5 floats per tri)
 		indexCount = 0; //not using indexed rendering so doesn't matter
 		glGenVertexArrays(1, &object); //generate the VAO
 		glBindVertexArray(object); //bind it
@@ -142,7 +181,7 @@ public:
 	{
 		attribBuffer = new GLBuffer(attribData, attribSize); //create vertex attribute buffer
 		indexBuffer = new GLBuffer(indexData, indexSize); //create vertex index buffer
-		triCount = attribSize / sizeof(float);
+		triCount = attribSize / (sizeof(float) * 5);
 		indexCount = indexSize / sizeof(int);
 		glGenVertexArrays(1, &object); //..
 		glBindVertexArray(object); //..
@@ -261,9 +300,23 @@ public:
 			program = 0; //set program to 0 to prevent OpenGL errors
 	}
 
+	void SetUniforms()
+	{
+		glm::uint oldProgram = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&oldProgram)); //get the active program
+		glUseProgram(program); //use our prog
+		glUniformMatrix4fv(glGetUniformLocation(program, "matrix"), 1, false, glm::value_ptr(mainCamera->GetCombinedMatrix())); //set the uniforms
+		glUseProgram(oldProgram); //activate the previously active prog
+	}
+
 	glm::uint GetProgram()
 	{
 		return program;
+	}
+
+	void Use()
+	{
+		glUseProgram(program);
 	}
 
 	~Shader()
@@ -290,4 +343,14 @@ void KeyDown(SDL_KeyboardEvent key)
 
 void KeyUp(SDL_KeyboardEvent key)
 {
+}
+
+void PrintGLErrors()
+{
+	GLenum err;
+	while ((err = glGetError()) != GL_NO_ERROR)
+	{
+		std::cout << std::hex << err << "\n";
+		std::cout << std::dec << std::endl;
+	}
 }

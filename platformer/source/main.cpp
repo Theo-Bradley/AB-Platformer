@@ -19,6 +19,50 @@ unsigned int planeIndices[6] = {
 	2, 3, 0
 };
 
+float cube[] = {
+	-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+	 0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+	-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+
+	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+	 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+	 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+	 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+	-0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+
+	-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+	-0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+	-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+	 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+	 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+	 0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+	 0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+	 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+	 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+	-0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+};
+
 GLObject* testObj;
 Shader* testShader;
 File* testFile;
@@ -28,8 +72,9 @@ int main(int argc, char** argv)
 	bool running = true;
 	init();
 
-	testObj = new GLObject(plane, sizeof(plane), planeIndices, sizeof(planeIndices));
-	testShader = new Shader(Path("error.vert").c_str(), Path("error.frag").c_str());
+	testObj = new GLObject(cube, sizeof(cube));
+	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
+	testShader->SetUniforms();
 
 	while (running)
 	{
@@ -70,7 +115,9 @@ int init()
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE); //use OpenGL core
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4); //use OpenGL 4.x
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5); //use OpenGL x.5
-	window = SDL_CreateWindow("Platformer", 1920, 1080, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
+	screenWidth = 1920.00f;
+	screenHeight = 1080.00f;
+	window = SDL_CreateWindow("Platformer", (int)screenWidth, (int)screenHeight, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
 	SDL_GLContext glContext = SDL_GL_CreateContext(window); //Create GL context
 	if (!glContext) //if failed to create context
 		quit(-1); //close
@@ -79,9 +126,13 @@ int init()
 		quit(-1); //close
 
 	errorShader = new Shader(true);
+	errorShader->Use();
+	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(-90.00f), 1.00f);
+
+	glEnable(GL_DEPTH_TEST);
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	SDL_GL_SwapWindow(window);
 	return 0;
 }
@@ -94,16 +145,12 @@ int quit(int code)
 
 void Draw()
 {
-	glClear(GL_COLOR_BUFFER_BIT); //clear frame buffer
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 
-	glUseProgram(testShader->GetProgram());
+	testShader->Use();
 	testObj->Draw();
-	GLenum err;
-	while ((err = glGetError()) != GL_NO_ERROR)
-	{
-		std::cout << std::hex << err << "\n";
-		std::cout << std::dec << std::endl;
-	}
+
+	PrintGLErrors();
 
 	SDL_GL_SwapWindow(window);
 }
