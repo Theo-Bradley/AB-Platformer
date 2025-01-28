@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include "glm/glm.hpp"
 
 
 #ifdef _WIN32
@@ -25,7 +26,7 @@ const char* errorFrag = { "#version 450 core\n"
 "out vec4 color;\n"
 "void main()\n"
 "{\n"
-"	color = vec4(243.0/255.0, 223.0/255.0, 162.0/255.0, 1.0);\n"
+"	color = vec4(1.0, 0.0, 1.0, 1.0);\n"
 "}\n"
 };
 
@@ -36,6 +37,11 @@ class Shader;
 SDL_Window* window;
 SDL_GLContext glContext;
 Shader* errorShader = nullptr;
+
+class Camera
+{
+	
+};
 
 class File
 {
@@ -82,7 +88,7 @@ public:
 class GLBuffer
 {
 protected:
-	GLuint buffer = 0;
+	glm::uint buffer = 0;
 
 public:
 
@@ -102,7 +108,7 @@ public:
 		glDeleteBuffers(1, &buffer);
 	}
 
-	GLuint const GetBuffer()
+	glm::uint const GetBuffer()
 	{
 		return buffer;
 	}
@@ -115,7 +121,7 @@ protected:
 	GLBuffer* indexBuffer;
 	unsigned int indexCount = 0;
 	unsigned int triCount = 0;
-	GLuint object = 0;
+	glm::uint object = 0;
 
 public:
 
@@ -173,15 +179,15 @@ public:
 class Shader
 {
 protected:
-	GLuint program = 0;
+	glm::uint program = 0;
 
 public:
 	Shader(const char* vertexPath, const char* fragmentPath)
 	{
 		File* vertexFile = new File(vertexPath);
 		File* fragmentFile = new File(fragmentPath);
-		GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER); //init empty shader
-		GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); //..
+		glm::uint vertexShader = glCreateShader(GL_VERTEX_SHADER); //init empty shader
+		glm::uint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); //..
 		glShaderSource(vertexShader, 1, vertexFile->GetDataPointer(), NULL); //load shader source
 		glCompileShader(vertexShader); //compile shader source
 		glShaderSource(fragmentShader, 1, fragmentFile->GetDataPointer(), NULL); //..
@@ -223,8 +229,8 @@ public:
 	{
 		if (isErrorShader)
 		{
-			GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER); //init empty shader
-			GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); //..
+			glm::uint vertexShader = glCreateShader(GL_VERTEX_SHADER); //init empty shader
+			glm::uint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); //..
 			glShaderSource(vertexShader, 1, &errorVert, NULL); //load shader source
 			glCompileShader(vertexShader); //compile shader source
 			glShaderSource(fragmentShader, 1, &errorFrag, NULL); //..
@@ -255,7 +261,7 @@ public:
 			program = 0; //set program to 0 to prevent OpenGL errors
 	}
 
-	GLuint GetProgram()
+	glm::uint GetProgram()
 	{
 		return program;
 	}

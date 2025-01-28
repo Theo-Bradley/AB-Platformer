@@ -30,3 +30,6 @@ platformer/.vs/*
 #exclude build directories
 platformer/platformer/*
 platformer/build/*
+
+#exclude external files (library zips etc)
+platformer/ext/*
