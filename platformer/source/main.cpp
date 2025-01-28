@@ -63,7 +63,7 @@ float cube[] = {
 	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f
 };
 
-GLObject* testObj;
+PhysicsObject* testObj;
 Shader* testShader;
 File* testFile;
 
@@ -72,9 +72,12 @@ int main(int argc, char** argv)
 	bool running = true;
 	init();
 
-	testObj = new GLObject(cube, sizeof(cube));
+	//testObj = new GLObject(cube, sizeof(cube));
+	testObj = new PhysicsObject(glm::vec3(0.00f), glm::vec3(0.00f), glm::vec3(0.00f), MaterialProperties{0.50f, 0.40f, 0.10f}, cube, sizeof(cube));
 	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
 	testShader->SetUniforms();
+
+	eTime = SDL_GetTicks();
 
 	while (running)
 	{
@@ -82,8 +85,10 @@ int main(int argc, char** argv)
 		eTime = SDL_GetTicks();
 		unsigned long long dTime = eTime - oldETime;
 		HandleEvents();
-		pScene->simulate(1000.00f / dTime); //simulate by delta time
+		float fTime = static_cast<float>(dTime + 1) / 1000.00f; //+1 so that fTime is never 0 (crashes physx)
+		pScene->simulate(fTime); //simulate by delta time
 		pScene->fetchResults(true); //wait for results
+
 
 		Draw();
 	}
@@ -161,9 +166,9 @@ int quit(int code)
 {
 	SDL_Quit();
 	if (pPhysics != nullptr)
-		pPhysics->release();
+		PX_RELEASE(pPhysics);
 	if (pFoundation != nullptr)
-		pFoundation->release();
+		PX_RELEASE(pFoundation);
 	exit(code);
 }
 
@@ -172,7 +177,7 @@ void Draw()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 
 	testShader->Use();
-	testObj->Draw();
+	static_cast<DrawableObject*>(testObj)->Draw();
 
 	PrintGLErrors();
 

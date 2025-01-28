@@ -78,6 +78,102 @@ unsigned long long int eTime = 0;
 
 float screenWidth, screenHeight;
 
+class Object
+{
+protected:
+	float x, y, z;
+	glm::quat rot = glm::quat(1.00f, 0.00f, 0.00f, 0.00f);
+	float width, length, height;
+
+public:
+	Object()
+	{
+		x = 0.00f;
+		y = 0.00f;
+		z = 0.00f;
+		rot = glm::quat(1.00f, 0.00f, 0.00f, 0.00f);
+		width = 1.00f;
+		length = 1.00f;
+		height = 1.00f;
+	}
+
+	Object(float _x, float _y, float _z, float _pitch, float _yaw, float _roll, float _width, float _length, float _height)
+	{
+		x = _x;
+		y = _y;
+		z = _z;
+		rot = glm::quat(glm::vec3(_pitch, _yaw, _roll));
+		width = _width;
+		length = _length;
+		height = _height;
+	}
+
+	Object(glm::vec3 pos, glm::quat _rot, glm::vec3 scale)
+	{
+		x = pos.x;
+		y = pos.y;
+		z = pos.z;
+		rot = _rot;
+		width = scale.x;
+		length = scale.z;
+		height = scale.y;
+	}
+
+	Object(PxVec3 pos, PxQuat _rot, PxVec3 scale)
+	{
+		x = pos.x;
+		y = pos.y;
+		z = pos.z;
+		rot = glm::quat(_rot.w, _rot.x, _rot.y, _rot.z);
+		width = scale.x;
+		length = scale.z;
+		height = scale.y;
+	}
+
+	void MoveX(float amt)
+	{
+		x += amt;
+	}
+
+	void MoveY(float amt)
+	{
+		y += amt;
+	}
+
+	void MoveZ(float amt)
+	{
+		z += amt;
+	}
+
+	void Move(glm::vec3 amt)
+	{
+		x += amt.x;
+		y += amt.y;
+		z += amt.z;
+	}
+
+	void Move(PxVec3 amt)
+	{
+		x += amt.x;
+		y += amt.y;
+		z += amt.z;
+	}
+
+	void Scale(glm::vec3 amt)
+	{
+		x *= amt.x;
+		y *= amt.y;
+		z *= amt.z;
+	}
+
+	void Scale(PxVec3 amt)
+	{
+		x *= amt.x;
+		y *= amt.y;
+		z *= amt.z;
+	}
+};
+
 class Camera
 {
 protected:
@@ -362,6 +458,125 @@ public:
 		}
 		else //if we are the error shader or the error shader doesn't exist
 			glDeleteProgram(program); //we can delete our program
+	}
+};
+
+struct MaterialProperties
+{
+	float staticFriction;
+	float dynamicFriction;
+	float restitution;
+};
+
+class DrawableObject: public Object
+{
+protected:
+	GLObject* renderObject;
+	glm::mat4 model;
+
+public:
+	DrawableObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale, void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
+	:Object(pos, _rot, scale){
+		renderObject = new GLObject(attribData, attribSize, indexData, indexSize);
+	}
+
+	DrawableObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale, void* attribData, unsigned int attribSize)
+	:Object(pos, _rot, scale) {
+		renderObject = new GLObject(attribData, attribSize);
+	}
+
+	DrawableObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
+		:Object(pos, _rot, scale) {
+		renderObject = new GLObject(attribData, attribSize, indexData, indexSize);
+	}
+
+	DrawableObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, void* attribData, unsigned int attribSize)
+		:Object(pos, _rot, scale) {
+		renderObject = new GLObject(attribData, attribSize);
+	}
+
+	//TODO: override move rotate etc
+	//TODO: add code to set shader uniform "mat4 model"
+
+	void CalculateModel()
+	{
+		//TODO
+	}
+
+	virtual void Draw()
+	{
+		//calculate model
+		//set current shader uniform "mat4 model"
+		renderObject->Draw();
+	}
+
+	virtual void Draw(Shader* shader)
+	{
+		shader->Use();
+		//calculate model
+		//set shader uniform "mat4 model"
+		renderObject->Draw();
+	}
+};
+
+class PhysicsObject: public DrawableObject
+{
+protected:
+	PxRigidDynamic* pBody;
+	PxMaterial* pMaterial;
+	PxShape* pShape;
+
+	void CreatePBody(MaterialProperties materialProperties)
+	{
+		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution);
+		pShape = pPhysics->createShape(PxBoxGeometry(0.50f, 0.50f, 0.50f), *pMaterial, true); //create the associated shape
+		PxQuat _rot = PxQuat(rot.x, rot.y, rot.z, rot.w);
+		PxTransform transform = PxTransform(x, y, z, _rot);
+		pBody = pPhysics->createRigidDynamic(transform);
+		pBody->attachShape(*pShape);
+		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f);
+		pScene->addActor(*pBody);
+	}
+
+public:
+	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
+		void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
+	:DrawableObject(pos, _rot, scale, attribData, attribSize, indexData, indexSize) {
+		CreatePBody(materialProperties);
+	}
+
+	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale,
+		MaterialProperties materialProperties, void* attribData, unsigned int attribSize)
+	:DrawableObject(pos, _rot, scale, attribData, attribSize) {
+		CreatePBody(materialProperties);
+	}
+
+	PhysicsObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale, MaterialProperties materialProperties,
+		void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
+		:DrawableObject(pos, _rot, scale, attribData, attribSize, indexData, indexSize) {
+		CreatePBody(materialProperties);
+	}
+
+	PhysicsObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale,
+		MaterialProperties materialProperties, void* attribData, unsigned int attribSize)
+		:DrawableObject(pos, _rot, scale, attribData, attribSize) {
+		CreatePBody(materialProperties);
+	}
+
+	~PhysicsObject()
+	{
+		pScene->removeActor(*pBody);
+		PX_RELEASE(pBody);
+	}
+
+	void Update()
+	{
+		PxTransform transform = pBody->getGlobalPose();
+		x = transform.p.x;
+		y = transform.p.y;
+		z = transform.p.z;
+		glm::quat _rot = glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z);
+		rot = glm::quat(_rot.w, _rot.x, _rot.y, _rot.z);
 	}
 };
 

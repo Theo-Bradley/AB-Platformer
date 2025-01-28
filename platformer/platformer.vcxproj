@@ -127,7 +127,7 @@
       </Message>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>xcopy /y /i /d "$(SolutionDir)lib\x64\*.dll" "$(OutDir)"
+      <Command>xcopy /y /i "$(SolutionDir)lib\x64\*.dll" "$(OutDir)"
 xcopy /y /s /e "$(SolutionDir)assets\*" "$(OutDir)\assets\"
 del "$(OutDir)*_64.dll"
 cd /D "$(OutDir)"
