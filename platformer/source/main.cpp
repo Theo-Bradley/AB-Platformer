@@ -141,19 +141,19 @@ int init()
 		quit(-1); //close
 	eTime = SDL_GetTicks();
 
-	pFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, pAlloc, pError);
-	pPvd = PxCreatePvd(*pFoundation);
-	PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10);
-	pPvd->connect(*transport, PxPvdInstrumentationFlag::eALL);
+	pFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, pAlloc, pError); //create the "foundation"
+	pPvd = PxCreatePvd(*pFoundation); //create a pvd instance
+	PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10); //set up the pvd transport
+	pPvd->connect(*transport, PxPvdInstrumentationFlag::eALL); //start pvd
 
-	pPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *pFoundation, physx::PxTolerancesScale(), true, pPvd);
+	pPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *pFoundation, physx::PxTolerancesScale(), true, pPvd); //create the physics solver
 
-	PxSceneDesc sceneDesc(pPhysics->getTolerancesScale());
-	sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f);
-	pDispatcher = PxDefaultCpuDispatcherCreate(2);
-	sceneDesc.cpuDispatcher = pDispatcher;
-	sceneDesc.filterShader = PxDefaultSimulationFilterShader;
-	pScene = pPhysics->createScene(sceneDesc);
+	PxSceneDesc sceneDesc(pPhysics->getTolerancesScale()); //create the scene description
+	sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f); //set gravity to g
+	pDispatcher = PxDefaultCpuDispatcherCreate(2); //create the default cpu task dispatcher
+	sceneDesc.cpuDispatcher = pDispatcher; //..
+	sceneDesc.filterShader = PxDefaultSimulationFilterShader; //create the default shader
+	pScene = pPhysics->createScene(sceneDesc); //create the scene
 
 	errorShader = new Shader(true);
 	errorShader->Use();
@@ -170,10 +170,15 @@ int init()
 int quit(int code)
 {
 	SDL_Quit();
+	if (pPvd != nullptr)
+		PX_RELEASE(pPvd);
+	if (pDispatcher != nullptr)
+		PX_RELEASE(pDispatcher);
 	if (pPhysics != nullptr)
 		PX_RELEASE(pPhysics);
 	if (pFoundation != nullptr)
 		PX_RELEASE(pFoundation);
+
 	exit(code);
 }
 

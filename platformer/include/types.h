@@ -496,19 +496,19 @@ public:
 
 	virtual void Draw()
 	{
-		model = CalculateModel();
-		unsigned int currentProgram = 0;
-		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&currentProgram));
-		glUniformMatrix4fv(glGetUniformLocation(currentProgram, "model"), 1, false, glm::value_ptr(model));
-		renderObject->Draw();
+		model = CalculateModel(); //get updated model mat
+		unsigned int currentProgram = 0; //init
+		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&currentProgram)); //get currently active program
+		glUniformMatrix4fv(glGetUniformLocation(currentProgram, "model"), 1, false, glm::value_ptr(model)); //set that program's model uniform to our model mat
+		renderObject->Draw(); //draw
 	}
 
 	virtual void Draw(Shader* shader)
 	{
-		shader->Use();
-		model = CalculateModel();
-		glUniformMatrix4fv(glGetUniformLocation(shader->GetProgram(), "model"), 1, false, glm::value_ptr(model));
-		renderObject->Draw();
+		shader->Use(); //make sure the passed shader is active
+		model = CalculateModel(); //get the updated model matrix
+		glUniformMatrix4fv(glGetUniformLocation(shader->GetProgram(), "model"), 1, false, glm::value_ptr(model)); //update the uniform in the shader to new matrix
+		renderObject->Draw(); //draw
 	}
 };
 
@@ -520,14 +520,14 @@ protected:
 
 	void CreatePBody(MaterialProperties materialProperties)
 	{
-		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution);
+		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
 		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(width/2.00f, height/2.00f, length/2.00f), *pMaterial, true); //create the associated shape
-		PxTransform transform = PxTransform(x, y, z, PxQuat(rot.x, rot.y, rot.z, rot.w));
-		pBody = pPhysics->createRigidDynamic(transform);
-		pBody->attachShape(*pShape);
-		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f);
-		pScene->addActor(*pBody);
-		PX_RELEASE(pShape);
+		PxTransform transform = PxTransform(x, y, z, PxQuat(rot.x, rot.y, rot.z, rot.w)); //create the starting transform from the class rot and xyz
+		pBody = pPhysics->createRigidDynamic(transform); //create the dynamic rigidbody
+		pBody->attachShape(*pShape); //attatch the shape to it
+		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
+		pScene->addActor(*pBody); //add rigid body to scene
+		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
 	}
 
 public:
@@ -557,17 +557,17 @@ public:
 
 	~PhysicsObject()
 	{
-		pScene->removeActor(*pBody);
-		PX_RELEASE(pBody);
+		pScene->removeActor(*pBody); //remove from the scene
+		PX_RELEASE(pBody); //free the memory
 	}
 
 	void Update()
 	{
-		PxTransform transform = pBody->getGlobalPose();
-		x = transform.p.x;
-		y = transform.p.y;
-		z = transform.p.z;
-		rot = glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z);
+		PxTransform transform = pBody->getGlobalPose(); //get the current "pose"
+		x = transform.p.x; //update the class position
+		y = transform.p.y; //..
+		z = transform.p.z; //..
+		rot = glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z); //convert PxQuat to glm::quat and update rotation
 	}
 
 	virtual void MoveX(float amt)
