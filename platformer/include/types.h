@@ -9,6 +9,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "PhysX/PxPhysicsAPI.h"
+#define STB_IMAGE_IMPLEMENTATION
+#ifdef WINDOWS
+	#define STBI_WINDOWS_UTF8 //change this have ifdef WINDOWS 
+#endif
+#include "stb/stb_image.h"
 
 using namespace physx;
 
@@ -35,9 +40,11 @@ const char* errorFrag = { "#version 450 core\n"
 };
 
 int quit(int code);
+void PrintGLErrors();
 
 class Shader;
 class Camera;
+class GLFramebuffer;
 
 class PhysicsErrorCallback : public PxErrorCallback
 {
@@ -74,9 +81,157 @@ PxDefaultCpuDispatcher* pDispatcher;
 PxScene* pScene;
 PxMaterial* pMaterial;
 PxPvd* pPvd;
+GLFramebuffer* depthBuffer;
 unsigned long long int eTime = 0;
 
 float screenWidth, screenHeight;
+
+class Texture
+{
+protected:
+	GLenum GLFormat;
+	unsigned int texture = 0;
+	int width, height;
+	bool successful = false;
+
+public:
+	Texture()
+	{
+		width = 0;
+		height = 0;
+		GLFormat = GL_R;
+		successful = false;
+		texture = 0;
+	}
+
+	Texture(const char* path)
+	{
+		int comp = 0;
+		unsigned char* imageData;
+		imageData = stbi_load(path, &width, &height, &comp, 0);
+		if (imageData != nullptr)
+		{
+			switch (comp)
+			{
+			case(1):
+				GLFormat = GL_R;
+				break;
+			case(2):
+				GLFormat = GL_RG;
+				break;
+			case(3):
+				GLFormat = GL_RGB;
+				break;
+			case(4):
+				GLFormat = GL_RGBA;
+				break;
+			defualt:
+				GLFormat = GL_R;
+				successful = false;
+				return;
+			}
+			unsigned int oldTexture = 0;
+			glGetIntegerv(GL_ACTIVE_TEXTURE, reinterpret_cast<int*>(&oldTexture));
+			glActiveTexture(GL_TEXTURE8); //select texture unit 8 (we have this reserved for creating textures)
+			glGenTextures(1, &texture); //gen empty tex
+			glBindTexture(GL_TEXTURE_2D, texture); //bind it
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP); //set wrapping values
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP); //..
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); //set filter values
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); //..
+			glTexImage2D(GL_TEXTURE_2D, 0, GLFormat, width, height, 0, GLFormat, GL_UNSIGNED_BYTE, imageData); //populate texture
+			glGenerateMipmap(GL_TEXTURE_2D); //generate mipmap
+			glActiveTexture(oldTexture);
+			successful = true;
+		}
+		else 
+		{
+			successful = false;
+		}
+		stbi_image_free(imageData);
+	}
+
+	Texture(int _width, int _height, GLenum format, GLenum internalFormat)
+	{
+		width = _width;
+		height = _height;
+		unsigned int oldTexture = 0;
+		glGetIntegerv(GL_ACTIVE_TEXTURE, reinterpret_cast<int*>(&oldTexture));
+		glActiveTexture(GL_TEXTURE8); //select texture unit 8 (we have this reserved for creating textures)
+		glGenTextures(1, &texture); //gen empty tex
+		glBindTexture(GL_TEXTURE_2D, texture); //bind it
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP); //set wrapping values
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP); //..
+		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, internalFormat, NULL); //allocate memory
+		glActiveTexture(oldTexture);
+		GLFormat = format;
+		successful = true;
+		PrintGLErrors();
+	}
+
+	~Texture()
+	{
+		glDeleteTextures(1, &texture);
+	}
+
+	void Use(GLenum unit)
+	{
+		glActiveTexture(unit);
+		glBindTexture(GL_TEXTURE_2D, texture);
+	}
+
+	unsigned int GetTexture()
+	{
+		return texture;
+	}
+};
+
+class GLFramebuffer
+{
+protected:
+	unsigned int framebuffer;
+	Texture* color;
+	Texture* depth;
+
+public:
+	GLFramebuffer()
+	{
+		glGenFramebuffers(1, &framebuffer);
+		color = new Texture((int)screenWidth, (int)screenHeight, GL_RGB, GL_UNSIGNED_BYTE);
+		depth = new Texture((int)screenWidth, (int)screenHeight, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE);
+		unsigned int oldFramebuffer = 0;
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER, reinterpret_cast<int*>(&oldFramebuffer));
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color->GetTexture(), 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth->GetTexture(), 0);
+		int completeness = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (completeness != GL_FRAMEBUFFER_COMPLETE)
+		{
+			std::cout << "Framebuffer Depth Completeness: 0x" << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << "\n";
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
+	}
+
+	~GLFramebuffer()
+	{
+		glDeleteFramebuffers(1, &framebuffer);
+	}
+
+	void Use()
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	}
+
+	Texture* GetColor()
+	{
+		return color;
+	}
+
+	Texture* GetDepth()
+	{
+		return depth;
+	}
+};
 
 class Object
 {
@@ -427,6 +582,8 @@ public:
 		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&oldProgram)); //get the active program
 		glUseProgram(program); //use our prog
 		glUniformMatrix4fv(glGetUniformLocation(program, "matrix"), 1, false, glm::value_ptr(mainCamera->GetCombinedMatrix())); //set the uniforms
+		glUniform2f(glGetUniformLocation(program, "screenSize"), glm::floor(screenWidth), glm::floor(screenHeight));
+
 		glUseProgram(oldProgram); //activate the previously active prog
 	}
 

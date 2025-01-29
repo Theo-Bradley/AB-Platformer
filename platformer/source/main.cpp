@@ -65,6 +65,7 @@ float cube[] = {
 
 PhysicsObject* testObj;
 Shader* testShader;
+Shader* outlineShader;
 File* testFile;
 
 int main(int argc, char** argv)
@@ -76,6 +77,8 @@ int main(int argc, char** argv)
 	testObj = new PhysicsObject(glm::vec3(0.00f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{0.50f, 0.40f, 0.30f}, cube, sizeof(cube));
 	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
 	testShader->SetUniforms();
+	outlineShader = new Shader(Path("outline.vert").c_str(), Path("outline.frag").c_str());
+	outlineShader->SetUniforms();
 
 	PxMaterial* planeMat = pPhysics->createMaterial(0.50f, 0.40f, 0.90f);
 	PxRigidStatic* plane = PxCreatePlane(*pPhysics, PxPlane(PxVec3(0.00f, -1.00f, 0.00f), PxVec3(0.00f, 1.00f, 0.00f)), *planeMat);
@@ -155,11 +158,11 @@ int init()
 	sceneDesc.filterShader = PxDefaultSimulationFilterShader; //create the default shader
 	pScene = pPhysics->createScene(sceneDesc); //create the scene
 
+	glEnable(GL_DEPTH_TEST);
 	errorShader = new Shader(true);
 	errorShader->Use();
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(-90.00f), 1.00f);
-
-	glEnable(GL_DEPTH_TEST);
+	depthBuffer = new GLFramebuffer();
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -172,8 +175,6 @@ int quit(int code)
 	SDL_Quit();
 	if (pPvd != nullptr)
 		PX_RELEASE(pPvd);
-	if (pDispatcher != nullptr)
-		PX_RELEASE(pDispatcher);
 	if (pPhysics != nullptr)
 		PX_RELEASE(pPhysics);
 	if (pFoundation != nullptr)
@@ -184,10 +185,19 @@ int quit(int code)
 
 void Draw()
 {
+	depthBuffer->Use();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
-
 	testShader->Use();
-	static_cast<DrawableObject*>(testObj)->Draw();
+	testObj->Draw();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
+	outlineShader->Use();
+	glUniform1i(glGetUniformLocation(outlineShader->GetProgram(), "depth"), 3);
+	Texture* foo = depthBuffer->GetDepth();
+	unsigned int bar = foo->GetTexture();
+	glBindTexture(GL_TEXTURE_2D, bar);
+	testObj->Draw();
 
 	PrintGLErrors();
 
