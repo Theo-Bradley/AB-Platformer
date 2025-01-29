@@ -73,9 +73,13 @@ int main(int argc, char** argv)
 	init();
 
 	//testObj = new GLObject(cube, sizeof(cube));
-	testObj = new PhysicsObject(glm::vec3(0.00f), glm::vec3(0.00f), glm::vec3(0.00f), MaterialProperties{0.50f, 0.40f, 0.10f}, cube, sizeof(cube));
+	testObj = new PhysicsObject(glm::vec3(0.00f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{0.50f, 0.40f, 0.30f}, cube, sizeof(cube));
 	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
 	testShader->SetUniforms();
+
+	PxMaterial* planeMat = pPhysics->createMaterial(0.50f, 0.40f, 0.90f);
+	PxRigidStatic* plane = PxCreatePlane(*pPhysics, PxPlane(PxVec3(0.00f, -1.00f, 0.00f), PxVec3(0.00f, 1.00f, 0.00f)), *planeMat);
+	pScene->addActor(*plane);
 
 	eTime = SDL_GetTicks();
 
@@ -89,6 +93,7 @@ int main(int argc, char** argv)
 		pScene->simulate(fTime); //simulate by delta time
 		pScene->fetchResults(true); //wait for results
 
+		testObj->Update();
 
 		Draw();
 	}

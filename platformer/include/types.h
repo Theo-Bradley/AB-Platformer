@@ -115,8 +115,8 @@ public:
 		z = pos.z;
 		rot = _rot;
 		width = scale.x;
-		length = scale.z;
 		height = scale.y;
+		length = scale.z;
 	}
 
 	Object(PxVec3 pos, PxQuat _rot, PxVec3 scale)
@@ -126,51 +126,42 @@ public:
 		z = pos.z;
 		rot = glm::quat(_rot.w, _rot.x, _rot.y, _rot.z);
 		width = scale.x;
-		length = scale.z;
 		height = scale.y;
+		length = scale.z;
 	}
 
-	void MoveX(float amt)
+	virtual void MoveX(float amt)
 	{
 		x += amt;
 	}
 
-	void MoveY(float amt)
+	virtual void MoveY(float amt)
 	{
 		y += amt;
 	}
 
-	void MoveZ(float amt)
+	virtual void MoveZ(float amt)
 	{
 		z += amt;
 	}
 
-	void Move(glm::vec3 amt)
+	virtual void Move(glm::vec3 amt)
 	{
 		x += amt.x;
 		y += amt.y;
 		z += amt.z;
 	}
 
-	void Move(PxVec3 amt)
+	virtual void Scale(glm::vec3 amt)
 	{
-		x += amt.x;
-		y += amt.y;
-		z += amt.z;
+		width *= amt.x;
+		length *= amt.y;
+		height *= amt.z;
 	}
 
-	void Scale(glm::vec3 amt)
+	virtual void Rotate(glm::quat _quat)
 	{
-		x *= amt.x;
-		y *= amt.y;
-		z *= amt.z;
-	}
-
-	void Scale(PxVec3 amt)
-	{
-		x *= amt.x;
-		y *= amt.y;
-		z *= amt.z;
+		rot = rot * _quat;
 	}
 };
 
@@ -495,26 +486,28 @@ public:
 		renderObject = new GLObject(attribData, attribSize);
 	}
 
-	//TODO: override move rotate etc
-	//TODO: add code to set shader uniform "mat4 model"
-
-	void CalculateModel()
+	glm::mat4 CalculateModel()
 	{
-		//TODO
+		glm::mat4 translate =  glm::translate(glm::mat4(1.00f), glm::vec3(x, y, z));
+		glm::mat4 rotate = glm::mat4_cast(rot);
+		glm::mat4 scale = glm::scale(glm::mat4(1.00f), glm::vec3(width, height, length));
+		return translate * rotate * scale;
 	}
 
 	virtual void Draw()
 	{
-		//calculate model
-		//set current shader uniform "mat4 model"
+		model = CalculateModel();
+		unsigned int currentProgram = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&currentProgram));
+		glUniformMatrix4fv(glGetUniformLocation(currentProgram, "model"), 1, false, glm::value_ptr(model));
 		renderObject->Draw();
 	}
 
 	virtual void Draw(Shader* shader)
 	{
 		shader->Use();
-		//calculate model
-		//set shader uniform "mat4 model"
+		model = CalculateModel();
+		glUniformMatrix4fv(glGetUniformLocation(shader->GetProgram(), "model"), 1, false, glm::value_ptr(model));
 		renderObject->Draw();
 	}
 };
@@ -524,18 +517,17 @@ class PhysicsObject: public DrawableObject
 protected:
 	PxRigidDynamic* pBody;
 	PxMaterial* pMaterial;
-	PxShape* pShape;
 
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution);
-		pShape = pPhysics->createShape(PxBoxGeometry(0.50f, 0.50f, 0.50f), *pMaterial, true); //create the associated shape
-		PxQuat _rot = PxQuat(rot.x, rot.y, rot.z, rot.w);
-		PxTransform transform = PxTransform(x, y, z, _rot);
+		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(width/2.00f, height/2.00f, length/2.00f), *pMaterial, true); //create the associated shape
+		PxTransform transform = PxTransform(x, y, z, PxQuat(rot.x, rot.y, rot.z, rot.w));
 		pBody = pPhysics->createRigidDynamic(transform);
 		pBody->attachShape(*pShape);
 		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f);
 		pScene->addActor(*pBody);
+		PX_RELEASE(pShape);
 	}
 
 public:
@@ -575,8 +567,47 @@ public:
 		x = transform.p.x;
 		y = transform.p.y;
 		z = transform.p.z;
-		glm::quat _rot = glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z);
-		rot = glm::quat(_rot.w, _rot.x, _rot.y, _rot.z);
+		rot = glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z);
+	}
+
+	virtual void MoveX(float amt)
+	{
+		DrawableObject::MoveX(amt);
+		PxQuat _rot = pBody->getGlobalPose().q;
+		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), _rot));
+	}
+
+	virtual void MoveY(float amt)
+	{
+		DrawableObject::MoveY(amt);
+		PxQuat _rot = pBody->getGlobalPose().q;
+		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), _rot));
+	}
+
+	virtual void MoveZ(float amt)
+	{
+		DrawableObject::MoveZ(amt);
+		PxQuat _rot = pBody->getGlobalPose().q;
+		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), _rot));
+	}
+
+	virtual void Move(glm::vec3 amt)
+	{
+		DrawableObject::Move(amt);
+		PxQuat _rot = pBody->getGlobalPose().q;
+		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), _rot));
+	}
+
+	virtual void Rotate(glm::quat _quat)
+	{
+		DrawableObject::Rotate(_quat);
+		PxVec3 _pos = pBody->getGlobalPose().p;
+		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), PxQuat(rot.x, rot.y, rot.z, rot.w)));
+	}
+
+	virtual void Scale(glm::vec3 amt)
+	{
+		DrawableObject::Scale(amt);
 	}
 };
 
