@@ -68,6 +68,7 @@ PhysicsObject* test2Obj;
 Shader* testShader;
 Shader* outlineShader;
 File* testFile;
+Model* testModel;
 
 int main(int argc, char** argv)
 {
@@ -75,8 +76,8 @@ int main(int argc, char** argv)
 	init();
 
 	//testObj = new GLObject(cube, sizeof(cube));
-	testObj = new PhysicsObject(glm::vec3(0.00f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{0.50f, 0.40f, 0.30f}, cube, sizeof(cube));
-	test2Obj = new PhysicsObject(glm::vec3(0.00f, 0.00f, -1.50f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, cube, sizeof(cube));
+	//testObj = new PhysicsObject(glm::vec3(0.00f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{0.50f, 0.40f, 0.30f}, cube, sizeof(cube));
+	//test2Obj = new PhysicsObject(glm::vec3(0.00f, 0.00f, -1.50f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, cube, sizeof(cube));
 	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
 	testShader->SetUniforms();
 	outlineShader = new Shader(Path("outline.vert").c_str(), Path("outline.frag").c_str());
@@ -86,6 +87,8 @@ int main(int argc, char** argv)
 	PxRigidStatic* plane = PxCreatePlane(*pPhysics, PxPlane(PxVec3(0.00f, -1.00f, 0.00f), PxVec3(0.00f, 1.00f, 0.00f)), *planeMat);
 	pScene->addActor(*plane);
 
+	testModel = new Model(Path("models/cube.fbx").c_str());
+	
 	eTime = SDL_GetTicks();
 
 	while (running)
@@ -98,7 +101,7 @@ int main(int argc, char** argv)
 		pScene->simulate(fTime); //simulate by delta time
 		pScene->fetchResults(true); //wait for results
 
-		testObj->Update();
+		//testObj->Update();
 
 		Draw();
 	}
@@ -175,10 +178,14 @@ int init()
 int quit(int code)
 {
 	SDL_Quit();
-	if (pPvd != nullptr)
-		PX_RELEASE(pPvd);
+	if (pScene != nullptr)
+		PX_RELEASE(pScene);
+	if (pDispatcher != nullptr)
+		PX_RELEASE(pDispatcher);
 	if (pPhysics != nullptr)
 		PX_RELEASE(pPhysics);
+	if (pPvd != nullptr)
+		PX_RELEASE(pPvd);
 	if (pFoundation != nullptr)
 		PX_RELEASE(pFoundation);
 
@@ -190,17 +197,17 @@ void Draw()
 	depthBuffer->Use();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	testShader->Use();
-	testObj->Draw();
-	test2Obj->Draw();
+	//testObj->Draw();
+	//test2Obj->Draw();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	outlineShader->Use();
 	glUniform1i(glGetUniformLocation(outlineShader->GetProgram(), "depth"), 3);
 	glBindTextureUnit(3, depthBuffer->GetDepth()->GetTexture());
-	//glBindTexture(GL_TEXTURE_2D, depthBuffer->GetDepth()->GetTexture());
-	testObj->Draw();
-	test2Obj->Draw();
+	//testObj->Draw();
+	//test2Obj->Draw();
+	testModel->Draw();
 
 	PrintGLErrors();
 

@@ -1,6 +1,7 @@
 #version 450 core
 
 //adapted from https://roystan.net/articles/outline-shader/
+//to make better, read the fixing artefacts section (about viewangle)
 
 out vec4 color;
 
