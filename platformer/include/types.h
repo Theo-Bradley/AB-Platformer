@@ -83,8 +83,10 @@ PxMaterial* pMaterial;
 PxPvd* pPvd;
 GLFramebuffer* depthBuffer;
 unsigned long long int eTime = 0;
-
+unsigned long long dTime = 1;
 float screenWidth, screenHeight;
+
+float oldDist = 2.00f;
 
 class Texture
 {
@@ -125,7 +127,7 @@ public:
 			case(4):
 				GLFormat = GL_RGBA;
 				break;
-			defualt:
+			default:
 				GLFormat = GL_R;
 				successful = false;
 				return;
@@ -160,9 +162,11 @@ public:
 		glActiveTexture(GL_TEXTURE8); //select texture unit 8 (we have this reserved for creating textures)
 		glGenTextures(1, &texture); //gen empty tex
 		glBindTexture(GL_TEXTURE_2D, texture); //bind it
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP); //set wrapping values
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP); //..
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, internalFormat, NULL); //allocate memory
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); //set wrapping values
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); //..
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, internalFormat, (void*)NULL); //allocate memory
 		glActiveTexture(oldTexture);
 		GLFormat = format;
 		successful = true;
@@ -198,9 +202,9 @@ public:
 	{
 		glGenFramebuffers(1, &framebuffer);
 		color = new Texture((int)screenWidth, (int)screenHeight, GL_RGB, GL_UNSIGNED_BYTE);
-		depth = new Texture((int)screenWidth, (int)screenHeight, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE);
+		depth = new Texture((int)screenWidth, (int)screenHeight, GL_DEPTH_COMPONENT, GL_FLOAT);
 		unsigned int oldFramebuffer = 0;
-		glGetIntegerv(GL_DRAW_FRAMEBUFFER, reinterpret_cast<int*>(&oldFramebuffer));
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color->GetTexture(), 0);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth->GetTexture(), 0);
@@ -339,7 +343,7 @@ protected:
 
 	glm::mat4 Project()
 	{
-		return glm::perspective(glm::radians(45.f), screenWidth/screenHeight, 0.01f, 10.00f);
+		return glm::perspective(glm::radians(45.f), screenWidth/screenHeight, 0.1f, 5.00f);
 	}
 
 public:
@@ -355,6 +359,11 @@ public:
 	glm::mat4 GetCombinedMatrix()
 	{
 		return projection * view;
+	}
+
+	void SetDistance(float val)
+	{
+		distance = val;
 	}
 };
 
@@ -694,8 +703,8 @@ public:
 		CreatePBody(materialProperties);
 	}
 
-	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale,
-		MaterialProperties materialProperties, void* attribData, unsigned int attribSize)
+	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
+		void* attribData, unsigned int attribSize)
 	:DrawableObject(pos, _rot, scale, attribData, attribSize) {
 		CreatePBody(materialProperties);
 	}
@@ -706,8 +715,8 @@ public:
 		CreatePBody(materialProperties);
 	}
 
-	PhysicsObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale,
-		MaterialProperties materialProperties, void* attribData, unsigned int attribSize)
+	PhysicsObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale, MaterialProperties materialProperties,
+		void* attribData, unsigned int attribSize)
 		:DrawableObject(pos, _rot, scale, attribData, attribSize) {
 		CreatePBody(materialProperties);
 	}
@@ -787,7 +796,6 @@ void PrintGLErrors()
 	GLenum err;
 	while ((err = glGetError()) != GL_NO_ERROR)
 	{
-		std::cout << std::hex << err << "\n";
-		std::cout << std::dec << std::endl;
+		std::cout << std::hex << "0x" << err << std::dec << "\n";
 	}
 }

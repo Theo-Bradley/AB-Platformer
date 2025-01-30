@@ -64,6 +64,7 @@ float cube[] = {
 };
 
 PhysicsObject* testObj;
+PhysicsObject* test2Obj;
 Shader* testShader;
 Shader* outlineShader;
 File* testFile;
@@ -75,6 +76,7 @@ int main(int argc, char** argv)
 
 	//testObj = new GLObject(cube, sizeof(cube));
 	testObj = new PhysicsObject(glm::vec3(0.00f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{0.50f, 0.40f, 0.30f}, cube, sizeof(cube));
+	test2Obj = new PhysicsObject(glm::vec3(0.00f, 0.00f, -1.50f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, cube, sizeof(cube));
 	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
 	testShader->SetUniforms();
 	outlineShader = new Shader(Path("outline.vert").c_str(), Path("outline.frag").c_str());
@@ -90,7 +92,7 @@ int main(int argc, char** argv)
 	{
 		unsigned long long oldETime = eTime;
 		eTime = SDL_GetTicks();
-		unsigned long long dTime = eTime - oldETime;
+		dTime = eTime - oldETime;
 		HandleEvents();
 		float fTime = static_cast<float>(dTime + 1) / 1000.00f; //+1 so that fTime is never 0 (crashes physx)
 		pScene->simulate(fTime); //simulate by delta time
@@ -189,15 +191,16 @@ void Draw()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	testShader->Use();
 	testObj->Draw();
+	test2Obj->Draw();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	outlineShader->Use();
 	glUniform1i(glGetUniformLocation(outlineShader->GetProgram(), "depth"), 3);
-	Texture* foo = depthBuffer->GetDepth();
-	unsigned int bar = foo->GetTexture();
-	glBindTexture(GL_TEXTURE_2D, bar);
+	glBindTextureUnit(3, depthBuffer->GetDepth()->GetTexture());
+	//glBindTexture(GL_TEXTURE_2D, depthBuffer->GetDepth()->GetTexture());
 	testObj->Draw();
+	test2Obj->Draw();
 
 	PrintGLErrors();
 
