@@ -168,7 +168,7 @@ int init()
 	depthBuffer = new GLFramebuffer();
 
 	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
-	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), *copyModel);
+	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(glm::radians(12.00f), glm::radians(12.00f), 0.00f)), *copyModel);
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

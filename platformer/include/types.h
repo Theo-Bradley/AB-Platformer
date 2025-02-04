@@ -237,9 +237,23 @@ public:
 		rot = rot * _quat;
 	}
 
+	virtual void SetPosition(glm::vec3 val)
+	{
+		x = val.x;
+		y = val.y;
+		z = val.z;
+	}
+
 	virtual void SetRotation(glm::quat val)
 	{
 		rot = val;
+	}
+
+	virtual void SetScale(glm::vec3 val)
+	{
+		width = val.x;
+		height = val.y;
+		length = val.z;
 	}
 };
 
@@ -749,6 +763,13 @@ public:
 	DrawableObject(const DrawableObject& other)
 	{
 		renderObject = new GLObject(*other.renderObject);
+		x = other.x;
+		y = other.y;
+		z = other.z;
+		rot = other.rot;
+		width = other.width;
+		height = other.height;
+		length = other.length;
 	}
 
 	DrawableObject()
@@ -856,6 +877,9 @@ protected:
 	//i think it would work like this: Model is created with no offset pos just transform from root node, then
 	//when set pos or rot is called on this object it sets it to the sum of offsetTransform (the relevant component)
 	//and the new pos/rot etc. So if we set pos to 1.0, 1.0, 1.0, the class sets it's pos to 1.0 + transform.position type shi
+	glm::vec3 parentPosition; //this is a misnomer, as it is actually the sum of the parent positions, same for rotation and scale
+	glm::quat parentRotation;
+	glm::vec3 parentScale;
 
 public:
 	Mesh(aiMesh* mesh, aiMatrix4x4 globalTransform)
@@ -893,19 +917,13 @@ public:
 			//init the DrawableObject
 			DrawableObject::InitializeRenderObject(vertices, numVerts * sizeof(Vertex), faces, numFaces * 3 * sizeof(unsigned int));
 			//init the drawable object pos rot scale
-			glm::vec3 matScale;
-			glm::quat matRot;
-			glm::vec3 matPos;
 			glm::vec3 matSkew;
 			glm::vec4 matProj;
-			glm::decompose(transform, matScale, matRot, matPos, matSkew, matProj); //get pos rot scale from transform matrix
-			DrawableObject::x = matPos.x; //set position
-			DrawableObject::y = matPos.y;
-			DrawableObject::z = matPos.z;
-			DrawableObject::rot = glm::conjugate(matRot); //get rotation from matrix (https://github.com/g-truc/glm/pull/1012)
-			DrawableObject::width = matScale.x; //get scale
-			DrawableObject::height = matScale.y;
-			DrawableObject::length = matScale.z;
+			glm::decompose(transform, parentScale, parentRotation, parentPosition, matSkew, matProj); //get pos rot scale from transform matrix
+			DrawableObject::SetPosition(parentPosition); //set position from matrix
+			parentRotation = glm::conjugate(parentRotation); //decompose returns quaternion conjugate instead of proper quaternion https://github.com/g-truc/glm/pull/1012
+			DrawableObject::SetRotation(parentRotation); //set rotation from matrix
+			DrawableObject::SetScale(parentScale); //set scale from matrix
 
 			delete[] vertices; //cleanup
 			delete[] faces; //cleanup
@@ -922,11 +940,29 @@ public:
 		:DrawableObject(other)
 	{
 		complete = other.complete;
+		parentPosition = other.parentPosition;
+		parentRotation = other.parentRotation;
+		parentScale = other.parentScale;
 	}
 
 	bool IsComplete()
 	{
 		return complete;
+	}
+
+	void SetPosition(glm::vec3 position)
+	{
+		Object::SetPosition(position + parentPosition);
+	}
+
+	void SetRotation(glm::quat rotation)
+	{
+		Object::SetRotation(rotation * parentRotation);
+	}
+
+	void SetScale(glm::vec3 scale)
+	{
+		Object::SetScale(scale * parentScale);
 	}
 };
 
@@ -967,7 +1003,10 @@ public:
 				return; //fail no meshes
 			}
 
-			TraverseNode(node, scene, transform); //start processing the scene
+			TraverseNode(node, scene, node->mTransformation); //start processing the scene
+			Model::Scale(_scale); //apply inital pos rot scale
+			Model::Rotate(_rot);
+			Model::Move(_pos);
 		}
 		else
 		{
@@ -983,14 +1022,10 @@ public:
 		{
 			meshes[i] = new Mesh(*other.meshes[i]);
 		}
-		//undo inital positioning of other model (essentially moving it to 0, 0, 0)
-		this->Move(-glm::vec3(other.x, other.y, other.z));
-		this->Rotate(glm::quat(other.rot.w, -other.rot.x, -other.rot.y, -other.rot.z));
-		this->Scale(glm::vec3(1.0f) / glm::vec3(width, height, length));
 		//initally position this model
-		this->Move(_pos);
-		this->Rotate(_rot);
-		this->Scale(_scale);
+		Model::SetPosition(_pos);
+		Model::SetRotation(_rot);
+		Model::SetScale(_scale);
 	}
 
 	~Model()
@@ -1083,10 +1118,28 @@ public:
 
 	void SetRotation(glm::quat val)
 	{
-		rot = val;
+		Object::SetRotation(val);
 		for (unsigned int i = 0; i < numMeshes; i++)
 		{
 			meshes[i]->SetRotation(val);
+		}
+	}
+
+	void SetPosition(glm::vec3 val)
+	{
+		Object::SetPosition(val);
+		for (unsigned int i = 0; i < numMeshes; i++)
+		{
+			meshes[i]->SetPosition(val);
+		}
+	}
+
+	void SetScale(glm::vec3 val)
+	{
+		Object::SetScale(val);
+		for (unsigned int i = 0; i < numMeshes; i++)
+		{
+			meshes[i]->SetScale(val);
 		}
 	}
 };
