@@ -8,6 +8,8 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/gtx/matrix_decompose.hpp"
 #include "PhysX/PxPhysicsAPI.h"
 #define STB_IMAGE_IMPLEMENTATION
 #ifdef WINDOWS
@@ -73,6 +75,50 @@ public:
 	}
 };
 
+class Key
+{
+protected:
+	SDL_Keycode keycode;
+	bool pressed = false;
+
+public:
+	Key(SDL_Keycode _keycode)
+	{
+		keycode = _keycode;
+		pressed = false;
+	}
+
+	SDL_Keycode GetCode()
+	{
+		return keycode;
+	}
+
+	bool Press()
+	{
+		if (!pressed)
+		{
+			pressed = true;
+			return true;
+		}
+		return false;
+	}
+
+	bool Release()
+	{
+		if (pressed)
+		{
+			pressed = false;
+			return true;
+		}
+		return false;
+	}
+};
+
+#define key_Forward SDLK_W
+#define key_Left SDLK_A
+#define key_Backward SDLK_S
+#define key_Right SDLK_D
+
 SDL_Window* window;
 SDL_GLContext glContext;
 Shader* errorShader = nullptr;
@@ -89,6 +135,11 @@ GLFramebuffer* depthBuffer;
 unsigned long long int eTime = 0;
 unsigned long long dTime = 1;
 float screenWidth, screenHeight;
+
+Key k_Forward = Key(key_Forward);
+Key k_Left = Key(key_Left);
+Key k_Backward = Key(key_Backward);
+Key k_Right = Key(key_Right);
 
 float oldDist = 2.00f;
 
@@ -714,14 +765,38 @@ glm::vec2 FromAssimpVec(aiVector2D _vec)
 	return glm::vec2(_vec.x, _vec.y);
 }
 
+//effectively transposes the aiMatrix4x4 into a glm::mat4
+glm::mat4 FromAssimpMat(aiMatrix4x4 _mat)
+{
+	glm::mat4 result = glm::mat4(0.0f);
+	result[0][0] = _mat[0][0]; //result[c][r] = _mat[r][c]
+	result[0][1] = _mat[1][0];
+	result[0][2] = _mat[2][0];
+	result[0][3] = _mat[3][0];
+	result[1][0] = _mat[0][1];
+	result[1][1] = _mat[1][1];
+	result[1][2] = _mat[2][1];
+	result[1][3] = _mat[3][1];
+	result[2][0] = _mat[0][2];
+	result[2][1] = _mat[1][2];
+	result[2][2] = _mat[2][2];
+	result[2][3] = _mat[3][2];
+	result[3][0] = _mat[0][3];
+	result[3][1] = _mat[1][3];
+	result[3][2] = _mat[2][3];
+	result[3][3] = _mat[3][3];
+	return result;
+}
+
 class Mesh: public DrawableObject
 {
 protected:
 	bool complete = false;
 
 public:
-	Mesh(aiMesh* mesh)
+	Mesh(aiMesh* mesh, aiMatrix4x4 globalTransform)
 	{
+		glm::mat4 transform = FromAssimpMat(globalTransform);//get global transform as assimpMat
 		unsigned int numVerts = mesh->mNumVertices;
 		if (numVerts > 0)
 		{
@@ -755,7 +830,23 @@ public:
 			}
 			int a = numVerts * sizeof(Vertex);
 			int b = numFaces * 3 * sizeof(unsigned int);
+			//init the DrawableObject
 			DrawableObject::InitializeRenderObject(vertices, a, faces, b);
+			//init the drawable object pos rot scale
+			glm::vec3 matScale;
+			glm::quat matRot;
+			glm::vec3 matPos;
+			glm::vec3 matSkew;
+			glm::vec4 matProj;
+			glm::decompose(transform, matScale, matRot, matPos, matSkew, matProj); //get pos rot scale from transform matrix
+			DrawableObject::x = matPos.x; //set position
+			DrawableObject::y = matPos.y;
+			DrawableObject::z = matPos.z;
+			DrawableObject::rot = glm::conjugate(matRot); //get rotation from matrix (https://github.com/g-truc/glm/pull/1012)
+			DrawableObject::width = matScale.x; //get scale
+			DrawableObject::height = matScale.y;
+			DrawableObject::length = matScale.z;
+
 			delete[] vertices; //cleanup
 			delete[] faces; //cleanup
 			complete = true;
@@ -805,7 +896,7 @@ public:
 				return; //fail no meshes
 			}
 
-			TraverseNode(node, scene); //start processing the scene
+			TraverseNode(node, scene, node->mTransformation); //start processing the scene
 		}
 		else
 		{
@@ -826,21 +917,20 @@ public:
 		delete[] meshes;
 	}
 
-	void TraverseNode(aiNode* node, const aiScene* scene) //depthwise node search
+	void TraverseNode(aiNode* node, const aiScene* scene, aiMatrix4x4 cumulativeTransform) //depthwise node search
 	{
+		aiMatrix4x4 transform = node->mTransformation * cumulativeTransform;
 		//process node
 		for (unsigned int meshNum = 0; meshNum < node->mNumMeshes; meshNum++) //loop over meshes on node
 		{
-
-			Mesh* mesh = new Mesh(scene->mMeshes[node->mMeshes[meshNum]]); //create a Mesh from the aiMesh
-			mesh->Scale(glm::vec3(0.50f));
+			Mesh* mesh = new Mesh(scene->mMeshes[node->mMeshes[meshNum]], transform); //create a Mesh from the aiMesh
 			meshes[meshNum] = mesh; //store
 		}
 
 		//traverse children
 		for (unsigned int i = 0; i < node->mNumChildren; i++) //depthwise traversal
 		{
-			TraverseNode(node->mChildren[i], scene); //interate
+			TraverseNode(node->mChildren[i], scene, transform); //interate
 		}
 	}
 
@@ -873,7 +963,6 @@ struct MaterialProperties
 	float dynamicFriction;
 	float restitution;
 };
-
 
 class PhysicsObject: public DrawableObject
 {
@@ -974,6 +1063,15 @@ public:
 	}
 };
 
+/*class Player : public PhysicsObject
+{
+	glm::vec2 moveDir;
+
+	Player()
+	{
+	}
+};*/
+
 void KeyDown(SDL_KeyboardEvent key)
 {
 	switch (key.key)
@@ -981,11 +1079,54 @@ void KeyDown(SDL_KeyboardEvent key)
 	case (SDLK_ESCAPE):
 		quit(0);
 		break;
+	case(key_Forward):
+		if (k_Forward.Press())
+		{
+		}
+		break;
+	case(key_Left):
+		if (k_Left.Press())
+		{
+		}
+		break;
+	case(key_Backward):
+		if (k_Backward.Press())
+		{
+		}
+		break;
+	case(key_Right):
+		if (k_Right.Press())
+		{
+		}
+		break;
 	}
 }
 
 void KeyUp(SDL_KeyboardEvent key)
 {
+	switch (key.key)
+	{
+	case(key_Forward):
+		if (k_Forward.Release())
+		{
+		}
+		break;
+	case(key_Left):
+		if (k_Left.Release())
+		{
+		}
+		break;
+	case(key_Backward):
+		if (k_Backward.Release())
+		{
+		}
+		break;
+	case(key_Right):
+		if (k_Right.Release())
+		{
+		}
+		break;
+	}
 }
 
 void PrintGLErrors()
