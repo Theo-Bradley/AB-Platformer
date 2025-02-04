@@ -50,7 +50,7 @@ void PrintGLErrors();
 class Shader;
 class Camera;
 class GLFramebuffer;
-class DrawableObject;
+class Player;
 
 class PhysicsErrorCallback : public PxErrorCallback
 {
@@ -135,6 +135,7 @@ GLFramebuffer* depthBuffer;
 unsigned long long int eTime = 0;
 unsigned long long dTime = 1;
 float screenWidth, screenHeight;
+Player* player;
 
 Key k_Forward = Key(key_Forward);
 Key k_Left = Key(key_Left);
@@ -234,6 +235,11 @@ public:
 	virtual void Rotate(glm::quat _quat)
 	{
 		rot = rot * _quat;
+	}
+
+	virtual void SetRotation(glm::quat val)
+	{
+		rot = val;
 	}
 };
 
@@ -846,11 +852,15 @@ class Mesh: public DrawableObject
 {
 protected:
 	bool complete = false;
+	glm::mat4 offsetTransform = glm::mat4(); //eventually use this to allow setting of parent position properly:
+	//i think it would work like this: Model is created with no offset pos just transform from root node, then
+	//when set pos or rot is called on this object it sets it to the sum of offsetTransform (the relevant component)
+	//and the new pos/rot etc. So if we set pos to 1.0, 1.0, 1.0, the class sets it's pos to 1.0 + transform.position type shi
 
 public:
 	Mesh(aiMesh* mesh, aiMatrix4x4 globalTransform)
 	{
-		glm::mat4 transform = FromAssimpMat(globalTransform);//get global transform as assimpMat
+		glm::mat4 transform = FromAssimpMat(globalTransform);//get global transform
 		unsigned int numVerts = mesh->mNumVertices;
 		if (numVerts > 0)
 		{
@@ -975,7 +985,7 @@ public:
 		}
 		//undo inital positioning of other model (essentially moving it to 0, 0, 0)
 		this->Move(-glm::vec3(other.x, other.y, other.z));
-		this->Rotate(glm::quat(other.rot[0], -other.rot[1], -other.rot[2], -other.rot[3]));
+		this->Rotate(glm::quat(other.rot.w, -other.rot.x, -other.rot.y, -other.rot.z));
 		this->Scale(glm::vec3(1.0f) / glm::vec3(width, height, length));
 		//initally position this model
 		this->Move(_pos);
@@ -1046,6 +1056,7 @@ public:
 
 	void Move(glm::vec3 amt)
 	{
+		Object::Move(amt);
 		for (unsigned int i = 0; i < numMeshes; i++)
 		{
 			meshes[i]->Move(amt);
@@ -1054,6 +1065,7 @@ public:
 
 	void Scale(glm::vec3 amt)
 	{
+		Object::Scale(amt);
 		for (unsigned int i = 0; i < numMeshes; i++)
 		{
 			meshes[i]->Scale(amt);
@@ -1062,9 +1074,19 @@ public:
 
 	void Rotate(glm::quat amt)
 	{
+		Object::Rotate(amt);
 		for (unsigned int i = 0; i < numMeshes; i++)
 		{
 			meshes[i]->Rotate(amt);
+		}
+	}
+
+	void SetRotation(glm::quat val)
+	{
+		rot = val;
+		for (unsigned int i = 0; i < numMeshes; i++)
+		{
+			meshes[i]->SetRotation(val);
 		}
 	}
 };
@@ -1075,6 +1097,16 @@ struct MaterialProperties
 	float dynamicFriction;
 	float restitution;
 };
+
+glm::vec3 FromPxVec3(PxVec3 from)
+{
+	return glm::vec3(from.x, from.y, from.z);
+}
+
+PxVec3 FromVec3(glm::vec3 from)
+{
+	return PxVec3(from.x, from.y, from.z);
+}
 
 class PhysicsObject: public Model
 {
@@ -1104,6 +1136,7 @@ public:
 	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
 		Model& otherModel): Model(otherModel, pos, _rot, scale)
 	{
+		CreatePBody(materialProperties);
 	}
 
 	~PhysicsObject()
@@ -1114,11 +1147,11 @@ public:
 
 	void Update()
 	{
+		PxVec3 old = PxVec3(x, y, z); //store the old pos as PxVec3
 		PxTransform transform = pBody->getGlobalPose(); //get the current "pose"
-		x = transform.p.x; //update the class position
-		y = transform.p.y; //..
-		z = transform.p.z; //..
-		rot = glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z); //convert PxQuat to glm::quat and update rotation
+		Model::Move(FromPxVec3(transform.p - old)); //update the model position
+		glm::quat oldRot = glm::quat(rot.w, -rot.x, -rot.y, -rot.z);
+		Model::SetRotation(glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z)); //apply new rotation
 	}
 
 	virtual void Move(glm::vec3 amt)
@@ -1132,7 +1165,7 @@ public:
 	{
 		Model::Rotate(_quat);
 		PxVec3 _pos = pBody->getGlobalPose().p;
-		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), PxQuat(rot.x, rot.y, rot.z, rot.w)));
+		pBody->setGlobalPose(PxTransform(_pos, PxQuat(rot.x, rot.y, rot.z, rot.w)));
 	}
 
 	virtual void Scale(glm::vec3 amt)
@@ -1143,15 +1176,36 @@ public:
 
 class Player : public PhysicsObject
 {
-	glm::vec2 moveDir;
+protected:
+	glm::vec2 moveDir = glm::vec2(0.00f);
+	float moveSpeed = 1.00f; //max movement speed
+	float moveTime = 0.30f; //time to get to moveSpeed
 
+public:
 	Player(glm::vec3 _pos, glm::quat _rot, Model& model)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.0f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
 	{
 	}
 	Player(glm::vec3 _pos, glm::quat _rot, const char* path)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.0f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
 	{
+	}
+
+	void MoveDir(glm::vec2 dir)
+	{
+		moveDir += dir;
+	}
+
+	void Update()
+	{	
+		glm::vec2 v = moveDir * moveSpeed; //get target move speed
+		glm::vec3 current = FromPxVec3(pBody->getLinearVelocity());
+		glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
+		glm::vec2 f = pBody->getMass() * (v - u) / moveTime;
+		glm::vec3 force = glm::vec3(f.x, 0.00f, f.y);
+		force = rot * force; //translate force into global frame
+		//pBody->addForce(FromVec3(force), PxForceMode::eFORCE); //apply force
+		PhysicsObject::Update();
 	}
 };
 
@@ -1165,21 +1219,29 @@ void KeyDown(SDL_KeyboardEvent key)
 	case(key_Forward):
 		if (k_Forward.Press())
 		{
+			if (player != nullptr)
+				player->MoveDir(glm::vec2(0.00f, 1.00f));
 		}
 		break;
 	case(key_Left):
 		if (k_Left.Press())
 		{
+			if (player != nullptr)
+				player->MoveDir(glm::vec2(-1.00f, 0.00f));
 		}
 		break;
 	case(key_Backward):
 		if (k_Backward.Press())
 		{
+			if (player != nullptr)
+				player->MoveDir(glm::vec2(0.00f, -1.00f));
 		}
 		break;
 	case(key_Right):
 		if (k_Right.Press())
 		{
+			if (player != nullptr)
+				player->MoveDir(glm::vec2(1.00f, 0.00f));
 		}
 		break;
 	}
@@ -1192,21 +1254,29 @@ void KeyUp(SDL_KeyboardEvent key)
 	case(key_Forward):
 		if (k_Forward.Release())
 		{
+			if (player != nullptr)
+				player->MoveDir(glm::vec2(0.00f, -1.00f));
 		}
 		break;
 	case(key_Left):
 		if (k_Left.Release())
 		{
+			if (player != nullptr)
+				player->MoveDir(glm::vec2(1.00f, 0.00f));
 		}
 		break;
 	case(key_Backward):
 		if (k_Backward.Release())
 		{
+			if (player != nullptr)
+				player->MoveDir(glm::vec2(0.00f, 1.00f));
 		}
 		break;
 	case(key_Right):
 		if (k_Right.Release())
 		{
+			if (player != nullptr)
+				player->MoveDir(glm::vec2(-1.00f, 0.00f));
 		}
 		break;
 	}
@@ -1217,6 +1287,6 @@ void PrintGLErrors()
 	GLenum err;
 	while ((err = glGetError()) != GL_NO_ERROR)
 	{
-		std::cout << std::hex << "0x" << err << std::dec << "\n";
+		std::cout << "OpenGL Error: " << std::hex << "0x" << err << std::dec << "\n";
 	}
 }

@@ -73,9 +73,6 @@ int main(int argc, char** argv)
 	bool running = true;
 	init();
 
-	//testObj = new GLObject(cube, sizeof(cube));
-	//testObj = new PhysicsObject(glm::vec3(0.00f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{0.50f, 0.40f, 0.30f}, cube, sizeof(cube));
-	//test2Obj = new PhysicsObject(glm::vec3(0.00f, 0.00f, -1.50f), glm::vec3(glm::radians(12.00f), glm::radians(45.00f), 0.00f), glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, cube, sizeof(cube));
 	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
 	testShader->SetUniforms();
 	outlineShader = new Shader(Path("outline.vert").c_str(), Path("outline.frag").c_str());
@@ -101,7 +98,8 @@ int main(int argc, char** argv)
 		pScene->simulate(fTime); //simulate by delta time
 		pScene->fetchResults(true); //wait for results
 
-		//testObj->Update();
+		if (player != nullptr)
+			player->Update();
 
 		Draw();
 	}
@@ -169,6 +167,9 @@ int init()
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(-90.00f), 1.00f);
 	depthBuffer = new GLFramebuffer();
 
+	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
+	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), *copyModel);
+
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	SDL_GL_SwapWindow(window);
@@ -197,17 +198,14 @@ void Draw()
 	depthBuffer->Use();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	testShader->Use();
-	//testObj->Draw();
-	//test2Obj->Draw();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	outlineShader->Use();
 	glUniform1i(glGetUniformLocation(outlineShader->GetProgram(), "depth"), 3);
 	glBindTextureUnit(3, depthBuffer->GetDepth()->GetTexture());
-	//testObj->Draw();
-	//test2Obj->Draw();
-	testModel->Draw();
+	if (player != nullptr)
+		player->Draw();
 
 	PrintGLErrors();
 
