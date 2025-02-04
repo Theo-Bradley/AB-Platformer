@@ -788,6 +788,29 @@ glm::mat4 FromAssimpMat(aiMatrix4x4 _mat)
 	return result;
 }
 
+//effectively transposes the glm::mat4 into an aiMatrix4x4
+aiMatrix4x4 FromGLMMat(glm::mat4 _mat)
+{
+	aiMatrix4x4 result = aiMatrix4x4();
+	result[0][0] = _mat[0][0]; //result[c][r] = _mat[r][c]
+	result[0][1] = _mat[1][0];
+	result[0][2] = _mat[2][0];
+	result[0][3] = _mat[3][0];
+	result[1][0] = _mat[0][1];
+	result[1][1] = _mat[1][1];
+	result[1][2] = _mat[2][1];
+	result[1][3] = _mat[3][1];
+	result[2][0] = _mat[0][2];
+	result[2][1] = _mat[1][2];
+	result[2][2] = _mat[2][2];
+	result[2][3] = _mat[3][2];
+	result[3][0] = _mat[0][3];
+	result[3][1] = _mat[1][3];
+	result[3][2] = _mat[2][3];
+	result[3][3] = _mat[3][3];
+	return result;
+}
+
 class Mesh: public DrawableObject
 {
 protected:
@@ -864,19 +887,20 @@ public:
 	}
 };
 
-class Model
+class Model: public Object
 {
 protected:
-
+	bool owner;
 	Mesh** meshes = nullptr;
 	unsigned int numMeshes = 0;
 
 public:
-	Model(const char* path)
+	Model(const char* path, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale)
 	{
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(path,
 			aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_GenSmoothNormals); //load scene
+		owner = true;
 		if (scene == nullptr)
 		{
 			std::cout << "Failed to make Model: Failed to load Scene at " << path << "\n";
@@ -885,6 +909,11 @@ public:
 		aiNode* node = scene->mRootNode;
 		if (node->mNumChildren > 0) //if root node has some children (ie not empty scene)
 		{
+			aiMatrix4x4 transform = node->mTransformation;
+			glm::mat4 tempTransform = FromAssimpMat(transform);
+			tempTransform = glm::translate(tempTransform, _pos) * glm::mat4_cast(_rot) * glm::scale(tempTransform, _scale);
+			transform = FromGLMMat(tempTransform);
+
 			numMeshes = scene->mNumMeshes; //get num of scene meshes
 			if (numMeshes > 0) //if there are some meshes in the scene
 			{
@@ -896,7 +925,7 @@ public:
 				return; //fail no meshes
 			}
 
-			TraverseNode(node, scene, node->mTransformation); //start processing the scene
+			TraverseNode(node, scene, transform); //start processing the scene
 		}
 		else
 		{
@@ -905,16 +934,26 @@ public:
 		}
 	}
 
+	Model(Model* modelPtr)
+	{
+		owner = false;
+		meshes = modelPtr->GetMeshes();
+		numMeshes = modelPtr->GetNumMeshes();
+	}
+
 	~Model()
 	{
-		if (numMeshes > 0 && meshes != nullptr)
+		if (owner) //if we own meshes
 		{
-			for (unsigned int i = 0; i < numMeshes; i++)
+			if (numMeshes > 0 && meshes != nullptr)
 			{
-				delete meshes[i];
+				for (unsigned int i = 0; i < numMeshes; i++)
+				{
+					delete meshes[i];
+				}
 			}
+			delete[] meshes;
 		}
-		delete[] meshes;
 	}
 
 	void TraverseNode(aiNode* node, const aiScene* scene, aiMatrix4x4 cumulativeTransform) //depthwise node search
@@ -955,6 +994,40 @@ public:
 			}
 		}
 	}
+
+	Mesh** GetMeshes()
+	{
+		return meshes;
+	}
+
+	unsigned int GetNumMeshes()
+	{
+		return numMeshes;
+	}
+
+	void Move(glm::vec3 amt)
+	{
+		for (int i = 0; i < numMeshes; i++)
+		{
+			meshes[i]->Move(amt);
+		}
+	}
+
+	void Scale(glm::vec3 amt)
+	{
+		for (int i = 0; i < numMeshes; i++)
+		{
+			meshes[i]->Scale(amt);
+		}
+	}
+
+	void Rotate(glm::quat amt)
+	{
+		for (int i = 0; i < numMeshes; i++)
+		{
+			meshes[i]->Rotate(amt);
+		}
+	}
 };
 
 struct MaterialProperties
@@ -964,7 +1037,7 @@ struct MaterialProperties
 	float restitution;
 };
 
-class PhysicsObject: public DrawableObject
+class PhysicsObject: public Model
 {
 protected:
 	PxRigidDynamic* pBody;
@@ -984,26 +1057,14 @@ protected:
 
 public:
 	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
-	:DrawableObject(pos, _rot, scale, attribData, attribSize, indexData, indexSize) {
+		Model* modelPtr)
+	:Model(modelPtr) {
 		CreatePBody(materialProperties);
 	}
 
 	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		void* attribData, unsigned int attribSize)
-	:DrawableObject(pos, _rot, scale, attribData, attribSize) {
-		CreatePBody(materialProperties);
-	}
-
-	PhysicsObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
-		:DrawableObject(pos, _rot, scale, attribData, attribSize, indexData, indexSize) {
-		CreatePBody(materialProperties);
-	}
-
-	PhysicsObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		void* attribData, unsigned int attribSize)
-		:DrawableObject(pos, _rot, scale, attribData, attribSize) {
+		const char* path)
+	:Model(path, pos, _rot, scale) {
 		CreatePBody(materialProperties);
 	}
 
@@ -1022,44 +1083,23 @@ public:
 		rot = glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z); //convert PxQuat to glm::quat and update rotation
 	}
 
-	virtual void MoveX(float amt)
-	{
-		DrawableObject::MoveX(amt);
-		PxQuat _rot = pBody->getGlobalPose().q;
-		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), _rot));
-	}
-
-	virtual void MoveY(float amt)
-	{
-		DrawableObject::MoveY(amt);
-		PxQuat _rot = pBody->getGlobalPose().q;
-		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), _rot));
-	}
-
-	virtual void MoveZ(float amt)
-	{
-		DrawableObject::MoveZ(amt);
-		PxQuat _rot = pBody->getGlobalPose().q;
-		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), _rot));
-	}
-
 	virtual void Move(glm::vec3 amt)
 	{
-		DrawableObject::Move(amt);
+		Model::Move(amt);
 		PxQuat _rot = pBody->getGlobalPose().q;
 		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), _rot));
 	}
 
 	virtual void Rotate(glm::quat _quat)
 	{
-		DrawableObject::Rotate(_quat);
+		Model::Rotate(_quat);
 		PxVec3 _pos = pBody->getGlobalPose().p;
 		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), PxQuat(rot.x, rot.y, rot.z, rot.w)));
 	}
 
 	virtual void Scale(glm::vec3 amt)
 	{
-		DrawableObject::Scale(amt);
+		Model::Scale(amt);
 	}
 };
 

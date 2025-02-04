@@ -87,7 +87,7 @@ int main(int argc, char** argv)
 	PxRigidStatic* plane = PxCreatePlane(*pPhysics, PxPlane(PxVec3(0.00f, -1.00f, 0.00f), PxVec3(0.00f, 1.00f, 0.00f)), *planeMat);
 	pScene->addActor(*plane);
 
-	testModel = new Model(Path("models/cube.fbx").c_str());
+	testModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	
 	eTime = SDL_GetTicks();
 
