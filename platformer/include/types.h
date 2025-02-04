@@ -26,6 +26,8 @@ using namespace physx;
 #define exit(code) exit(##code##)
 #endif
 
+#define PI glm::pi<float>()
+
 #define Path(asset) std::string(SDL_GetBasePath() + std::string("assets\\") +std::string(##asset##))
 
 const char* errorVert = { "#version 450 core\n"
@@ -135,6 +137,7 @@ GLFramebuffer* depthBuffer;
 unsigned long long int eTime = 0;
 unsigned long long dTime = 1;
 float screenWidth, screenHeight;
+float sensitivity = 0.66f;
 Player* player;
 
 Key k_Forward = Key(key_Forward);
@@ -151,19 +154,94 @@ struct Vertex
 	glm::vec2 uv;
 };
 
+glm::vec3 FromAssimpVec(aiVector3D _vec)
+{
+	return glm::vec3(_vec.x, _vec.y, _vec.z);
+}
+
+glm::vec2 FromAssimpVec(aiVector2D _vec)
+{
+	return glm::vec2(_vec.x, _vec.y);
+}
+
+glm::vec3 FromPxVec(PxVec3 from)
+{
+	return glm::vec3(from.x, from.y, from.z);
+}
+
+PxVec3 FromGLMVec(glm::vec3 from)
+{
+	return PxVec3(from.x, from.y, from.z);
+}
+
+glm::quat FromPxQuat(PxQuat from)
+{
+	return glm::quat(from.w, from.x, from.y, from.z);
+}
+
+PxQuat FromGLMQuat(glm::quat from)
+{
+	return PxQuat(from.x, from.y, from.z, from.w);
+}
+
+//effectively transposes the aiMatrix4x4 into a glm::mat4
+glm::mat4 FromAssimpMat(aiMatrix4x4 _mat)
+{
+	glm::mat4 result = glm::mat4(0.0f);
+	result[0][0] = _mat[0][0]; //result[c][r] = _mat[r][c]
+	result[0][1] = _mat[1][0];
+	result[0][2] = _mat[2][0];
+	result[0][3] = _mat[3][0];
+	result[1][0] = _mat[0][1];
+	result[1][1] = _mat[1][1];
+	result[1][2] = _mat[2][1];
+	result[1][3] = _mat[3][1];
+	result[2][0] = _mat[0][2];
+	result[2][1] = _mat[1][2];
+	result[2][2] = _mat[2][2];
+	result[2][3] = _mat[3][2];
+	result[3][0] = _mat[0][3];
+	result[3][1] = _mat[1][3];
+	result[3][2] = _mat[2][3];
+	result[3][3] = _mat[3][3];
+	return result;
+}
+
+//effectively transposes the glm::mat4 into an aiMatrix4x4
+aiMatrix4x4 FromGLMMat(glm::mat4 _mat)
+{
+	aiMatrix4x4 result = aiMatrix4x4();
+	result[0][0] = _mat[0][0]; //result[c][r] = _mat[r][c]
+	result[0][1] = _mat[1][0];
+	result[0][2] = _mat[2][0];
+	result[0][3] = _mat[3][0];
+	result[1][0] = _mat[0][1];
+	result[1][1] = _mat[1][1];
+	result[1][2] = _mat[2][1];
+	result[1][3] = _mat[3][1];
+	result[2][0] = _mat[0][2];
+	result[2][1] = _mat[1][2];
+	result[2][2] = _mat[2][2];
+	result[2][3] = _mat[3][2];
+	result[3][0] = _mat[0][3];
+	result[3][1] = _mat[1][3];
+	result[3][2] = _mat[2][3];
+	result[3][3] = _mat[3][3];
+	return result;
+}
+
+
 class Object
 {
 protected:
-	float x, y, z;
+	glm::vec3 pos;
 	glm::quat rot = glm::quat(1.00f, 0.00f, 0.00f, 0.00f);
 	float width, length, height;
 
 public:
 	Object()
 	{
-		x = 0.00f;
-		y = 0.00f;
-		z = 0.00f;
+		pos = glm::vec3(0.00f);
 		rot = glm::quat(1.00f, 0.00f, 0.00f, 0.00f);
 		width = 1.00f;
 		length = 1.00f;
@@ -172,57 +250,34 @@ public:
 
 	Object(float _x, float _y, float _z, float _pitch, float _yaw, float _roll, float _width, float _length, float _height)
 	{
-		x = _x;
-		y = _y;
-		z = _z;
+		pos = glm::vec3(_x, _y, _z);
 		rot = glm::quat(glm::vec3(_pitch, _yaw, _roll));
 		width = _width;
 		length = _length;
 		height = _height;
 	}
 
-	Object(glm::vec3 pos, glm::quat _rot, glm::vec3 scale)
+	Object(glm::vec3 _pos, glm::quat _rot, glm::vec3 scale)
 	{
-		x = pos.x;
-		y = pos.y;
-		z = pos.z;
+		pos = _pos;
 		rot = _rot;
 		width = scale.x;
 		height = scale.y;
 		length = scale.z;
 	}
 
-	Object(PxVec3 pos, PxQuat _rot, PxVec3 scale)
+	Object(PxVec3 _pos, PxQuat _rot, PxVec3 scale)
 	{
-		x = pos.x;
-		y = pos.y;
-		z = pos.z;
+		pos = FromPxVec(_pos);
 		rot = glm::quat(_rot.w, _rot.x, _rot.y, _rot.z);
 		width = scale.x;
 		height = scale.y;
 		length = scale.z;
 	}
 
-	virtual void MoveX(float amt)
-	{
-		x += amt;
-	}
-
-	virtual void MoveY(float amt)
-	{
-		y += amt;
-	}
-
-	virtual void MoveZ(float amt)
-	{
-		z += amt;
-	}
-
 	virtual void Move(glm::vec3 amt)
 	{
-		x += amt.x;
-		y += amt.y;
-		z += amt.z;
+		pos += amt;
 	}
 
 	virtual void Scale(glm::vec3 amt)
@@ -239,9 +294,7 @@ public:
 
 	virtual void SetPosition(glm::vec3 val)
 	{
-		x = val.x;
-		y = val.y;
-		z = val.z;
+		pos = val;
 	}
 
 	virtual void SetRotation(glm::quat val)
@@ -255,13 +308,28 @@ public:
 		height = val.y;
 		length = val.z;
 	}
+
+	virtual glm::vec3 GetPosition()
+	{
+		return pos;
+	}
+
+	virtual glm::quat GetRotation()
+	{
+		return rot;
+	}
+
+	virtual glm::vec3 GetScale()
+	{
+		return glm::vec3(width, height, length);
+	}
 };
 
 class Camera
 {
 protected:
 	float angle;
-	float height;
+	float inclination;
 	float distance;
 	glm::mat4 view;
 	glm::mat4 projection;
@@ -270,20 +338,28 @@ protected:
 	{
 		//sin(theta) z coord
 		//cos(theta) x coord
-		glm::vec3 cameraPos = glm::vec3(distance * glm::cos(angle), height, distance * -glm::sin(angle));
+		glm::vec3 cameraPos = glm::vec3(distance * glm::cos(angle), distance * glm::sin(inclination), distance * -glm::sin(angle));
 		return glm::lookAt(target + cameraPos, target, glm::vec3(0.00f, 1.00f, 0.00f));
+	}
+
+	glm::mat4 LookAt(Object target)
+	{
+		//sin(theta) z coord
+		//cos(theta) x coord
+		glm::vec3 cameraPos = glm::vec3(distance * glm::cos(angle), distance * glm::sin(inclination), distance * -glm::sin(angle));
+		return glm::lookAt(target.GetPosition() + cameraPos, target.GetPosition(), glm::vec3(0.00f, 1.00f, 0.00f));
 	}
 
 	glm::mat4 Project()
 	{
-		return glm::perspective(glm::radians(45.f), screenWidth/screenHeight, 0.1f, 5.00f);
+		return glm::perspective(glm::radians(45.f), screenWidth/screenHeight, 0.1f, 15.00f);
 	}
 
 public:
-	Camera(glm::vec3 _target, float _angle, float _height)
+	Camera(glm::vec3 _target, float _angle)
 	{
 		angle = _angle;
-		height = _height;
+		inclination = glm::radians(45.00f);
 		distance = 2.00f;
 		view = LookAt(_target);
 		projection = Project();
@@ -297,6 +373,51 @@ public:
 	void SetDistance(float val)
 	{
 		distance = val;
+	}
+
+	void SetAngle(float val)
+	{
+		angle = glm::mod(val, 2 * PI);
+	}
+
+	void Angle(float amt)
+	{
+		angle = glm::mod(angle + amt, 2 * PI);
+	}
+
+	void SetInclination(float val)
+	{
+		inclination = glm::mod(val, 2 * PI);
+	}
+
+	void Inclination(float amt)
+	{
+		inclination = glm::mod(inclination + amt, 2 * PI);
+	}
+
+	void Follow(glm::vec3 target)
+	{
+		view = LookAt(target);
+	}
+
+	glm::mat4 GetView()
+	{
+		return view;
+	}
+
+	float GetAngle()
+	{
+		return angle;
+	}
+
+	float GetInclination()
+	{
+		return inclination;
+	}
+
+	void Distance(float amt)
+	{
+		distance += amt;
 	}
 };
 
@@ -763,9 +884,7 @@ public:
 	DrawableObject(const DrawableObject& other)
 	{
 		renderObject = new GLObject(*other.renderObject);
-		x = other.x;
-		y = other.y;
-		z = other.z;
+		pos = other.pos;
 		rot = other.rot;
 		width = other.width;
 		height = other.height;
@@ -789,7 +908,7 @@ public:
 
 	glm::mat4 CalculateModel()
 	{
-		glm::mat4 translate = glm::translate(glm::mat4(1.00f), glm::vec3(x, y, z));
+		glm::mat4 translate = glm::translate(glm::mat4(1.00f), pos);
 		glm::mat4 rotate = glm::mat4_cast(rot);
 		glm::mat4 scale = glm::scale(glm::mat4(1.00f), glm::vec3(width, height, length));
 		return translate * rotate * scale;
@@ -813,70 +932,10 @@ public:
 	}
 };
 
-glm::vec3 FromAssimpVec(aiVector3D _vec)
-{
-	return glm::vec3(_vec.x, _vec.y, _vec.z);
-}
-
-glm::vec2 FromAssimpVec(aiVector2D _vec)
-{
-	return glm::vec2(_vec.x, _vec.y);
-}
-
-//effectively transposes the aiMatrix4x4 into a glm::mat4
-glm::mat4 FromAssimpMat(aiMatrix4x4 _mat)
-{
-	glm::mat4 result = glm::mat4(0.0f);
-	result[0][0] = _mat[0][0]; //result[c][r] = _mat[r][c]
-	result[0][1] = _mat[1][0];
-	result[0][2] = _mat[2][0];
-	result[0][3] = _mat[3][0];
-	result[1][0] = _mat[0][1];
-	result[1][1] = _mat[1][1];
-	result[1][2] = _mat[2][1];
-	result[1][3] = _mat[3][1];
-	result[2][0] = _mat[0][2];
-	result[2][1] = _mat[1][2];
-	result[2][2] = _mat[2][2];
-	result[2][3] = _mat[3][2];
-	result[3][0] = _mat[0][3];
-	result[3][1] = _mat[1][3];
-	result[3][2] = _mat[2][3];
-	result[3][3] = _mat[3][3];
-	return result;
-}
-
-//effectively transposes the glm::mat4 into an aiMatrix4x4
-aiMatrix4x4 FromGLMMat(glm::mat4 _mat)
-{
-	aiMatrix4x4 result = aiMatrix4x4();
-	result[0][0] = _mat[0][0]; //result[c][r] = _mat[r][c]
-	result[0][1] = _mat[1][0];
-	result[0][2] = _mat[2][0];
-	result[0][3] = _mat[3][0];
-	result[1][0] = _mat[0][1];
-	result[1][1] = _mat[1][1];
-	result[1][2] = _mat[2][1];
-	result[1][3] = _mat[3][1];
-	result[2][0] = _mat[0][2];
-	result[2][1] = _mat[1][2];
-	result[2][2] = _mat[2][2];
-	result[2][3] = _mat[3][2];
-	result[3][0] = _mat[0][3];
-	result[3][1] = _mat[1][3];
-	result[3][2] = _mat[2][3];
-	result[3][3] = _mat[3][3];
-	return result;
-}
-
 class Mesh: public DrawableObject
 {
 protected:
 	bool complete = false;
-	glm::mat4 offsetTransform = glm::mat4(); //eventually use this to allow setting of parent position properly:
-	//i think it would work like this: Model is created with no offset pos just transform from root node, then
-	//when set pos or rot is called on this object it sets it to the sum of offsetTransform (the relevant component)
-	//and the new pos/rot etc. So if we set pos to 1.0, 1.0, 1.0, the class sets it's pos to 1.0 + transform.position type shi
 	glm::vec3 parentPosition; //this is a misnomer, as it is actually the sum of the parent positions, same for rotation and scale
 	glm::quat parentRotation;
 	glm::vec3 parentScale;
@@ -1151,16 +1210,6 @@ struct MaterialProperties
 	float restitution;
 };
 
-glm::vec3 FromPxVec3(PxVec3 from)
-{
-	return glm::vec3(from.x, from.y, from.z);
-}
-
-PxVec3 FromVec3(glm::vec3 from)
-{
-	return PxVec3(from.x, from.y, from.z);
-}
-
 class PhysicsObject: public Model
 {
 protected:
@@ -1170,8 +1219,8 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(width/2.00f, height/2.00f, length/2.00f), *pMaterial, true); //create the associated shape
-		PxTransform transform = PxTransform(x, y, z, PxQuat(rot.x, rot.y, rot.z, rot.w)); //create the starting transform from the class rot and xyz
+		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(width / 2.00f, height / 2.00f, length / 2.00f), *pMaterial, true); //create the associated shape
+		PxTransform transform = PxTransform(FromGLMVec(pos), PxQuat(rot.x, rot.y, rot.z, rot.w)); //create the starting transform from the class rot and xyz
 		pBody = pPhysics->createRigidDynamic(transform); //create the dynamic rigidbody
 		pBody->attachShape(*pShape); //attatch the shape to it
 		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
@@ -1200,10 +1249,8 @@ public:
 
 	void Update()
 	{
-		PxVec3 old = PxVec3(x, y, z); //store the old pos as PxVec3
 		PxTransform transform = pBody->getGlobalPose(); //get the current "pose"
-		Model::Move(FromPxVec3(transform.p - old)); //update the model position
-		glm::quat oldRot = glm::quat(rot.w, -rot.x, -rot.y, -rot.z);
+		Model::SetPosition(FromPxVec(transform.p)); //update the model position
 		Model::SetRotation(glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z)); //apply new rotation
 	}
 
@@ -1211,14 +1258,14 @@ public:
 	{
 		Model::Move(amt);
 		PxQuat _rot = pBody->getGlobalPose().q;
-		pBody->setGlobalPose(PxTransform(PxVec3(x, y, z), _rot));
+		pBody->setGlobalPose(PxTransform(FromGLMVec(pos), _rot));
 	}
 
 	virtual void Rotate(glm::quat _quat)
 	{
 		Model::Rotate(_quat);
 		PxVec3 _pos = pBody->getGlobalPose().p;
-		pBody->setGlobalPose(PxTransform(_pos, PxQuat(rot.x, rot.y, rot.z, rot.w)));
+		pBody->setGlobalPose(PxTransform(_pos, FromGLMQuat(rot)));
 	}
 
 	virtual void Scale(glm::vec3 amt)
@@ -1231,8 +1278,8 @@ class Player : public PhysicsObject
 {
 protected:
 	glm::vec2 moveDir = glm::vec2(0.00f);
-	float moveSpeed = 1.00f; //max movement speed
-	float moveTime = 0.30f; //time to get to moveSpeed
+	float moveSpeed = 10.00f; //max movement speed
+	float moveTime = 0.50f; //time to get to moveSpeed
 
 public:
 	Player(glm::vec3 _pos, glm::quat _rot, Model& model)
@@ -1251,13 +1298,12 @@ public:
 
 	void Update()
 	{	
-		glm::vec2 v = moveDir * moveSpeed; //get target move speed
-		glm::vec3 current = FromPxVec3(pBody->getLinearVelocity());
+		glm::vec4 worldV = glm::rotate(mainCamera->GetAngle() + 0.50f * PI, glm::vec3(0.00f, 1.00f, 0.00f)) * glm::vec4(moveDir.x * moveSpeed, 0.00f, moveDir.y * -moveSpeed, 0.0);
+		glm::vec2 v = glm::vec2(worldV.x, worldV.z); //get target move speed
+		glm::vec3 current = FromPxVec(pBody->getLinearVelocity());
 		glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
 		glm::vec2 f = pBody->getMass() * (v - u) / moveTime;
-		glm::vec3 force = glm::vec3(f.x, 0.00f, f.y);
-		force = rot * force; //translate force into global frame
-		//pBody->addForce(FromVec3(force), PxForceMode::eFORCE); //apply force
+		pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply force
 		PhysicsObject::Update();
 	}
 };
@@ -1332,6 +1378,26 @@ void KeyUp(SDL_KeyboardEvent key)
 				player->MoveDir(glm::vec2(-1.00f, 0.00f));
 		}
 		break;
+	}
+}
+
+void MouseMoved()
+{
+	const glm::vec2 radPerScreen = sensitivity * PI / glm::vec2(screenWidth, screenHeight);
+	float deltaX, deltaY;
+	SDL_GetRelativeMouseState(&deltaX, &deltaY);
+	if (mainCamera != nullptr)
+	{
+		mainCamera->Angle(-deltaX * radPerScreen.x);
+		mainCamera->Inclination(deltaY * radPerScreen.y);
+	}
+}
+
+void MouseWheel(SDL_MouseWheelEvent e)
+{
+	if (mainCamera != nullptr)
+	{
+		mainCamera->Distance(-e.y * 0.50f);
 	}
 }
 

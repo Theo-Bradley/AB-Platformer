@@ -67,6 +67,7 @@ Shader* testShader;
 Shader* outlineShader;
 File* testFile;
 Model* testModel;
+PhysicsObject* obj1;
 
 int main(int argc, char** argv)
 {
@@ -83,7 +84,7 @@ int main(int argc, char** argv)
 	pScene->addActor(*plane);
 
 	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
-	testModel = new Model(*copyModel, glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(12.0f), 0.0f)), glm::vec3(1.0f));
+	obj1 = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, *copyModel);
 	delete copyModel;
 	
 	eTime = SDL_GetTicks();
@@ -98,9 +99,11 @@ int main(int argc, char** argv)
 		pScene->simulate(fTime); //simulate by delta time
 		pScene->fetchResults(true); //wait for results
 
+		obj1->Update();
 		if (player != nullptr)
 			player->Update();
 
+		mainCamera->Follow(player->GetPosition());
 		Draw();
 	}
 	return quit(0);
@@ -123,6 +126,12 @@ void HandleEvents()
 		case SDL_EVENT_KEY_UP:
 			KeyUp(event.key);
 			break;
+		case SDL_EVENT_MOUSE_MOTION:
+			MouseMoved();
+			break;
+		case SDL_EVENT_MOUSE_WHEEL:
+			MouseWheel(event.wheel);
+			break;
 		}
 	}
 }
@@ -139,6 +148,7 @@ int init()
 	screenWidth = 1920.00f;
 	screenHeight = 1080.00f;
 	window = SDL_CreateWindow("Platformer", (int)screenWidth, (int)screenHeight, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
+	SDL_SetWindowRelativeMouseMode(window, true); //capture the mouse
 	SDL_GLContext glContext = SDL_GL_CreateContext(window); //Create GL context
 	if (!glContext) //if failed to create context
 		quit(-1); //close
@@ -164,11 +174,11 @@ int init()
 	glEnable(GL_DEPTH_TEST);
 	errorShader = new Shader(true);
 	errorShader->Use();
-	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(-90.00f), 1.00f);
+	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
 
 	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
-	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(glm::radians(12.00f), glm::radians(12.00f), 0.00f)), *copyModel);
+	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), *copyModel);
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -198,12 +208,17 @@ void Draw()
 	depthBuffer->Use();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	testShader->Use();
+	testShader->SetUniforms();
+	obj1->Draw();
+	player->Draw();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	outlineShader->Use();
+	outlineShader->SetUniforms();
 	glUniform1i(glGetUniformLocation(outlineShader->GetProgram(), "depth"), 3);
 	glBindTextureUnit(3, depthBuffer->GetDepth()->GetTexture());
+	obj1->Draw();
 	if (player != nullptr)
 		player->Draw();
 
