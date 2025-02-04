@@ -596,11 +596,19 @@ protected:
 	unsigned int size = 0;
 
 public:
-
 	GLBuffer(void* data, unsigned int _size)
 	{
 		glCreateBuffers(1, &buffer); //generate and initalize buffer
 		glNamedBufferData(buffer, _size, data, GL_STATIC_DRAW); //populate it
+		size = _size;
+	}
+
+	GLBuffer(const GLBuffer& other)
+	{
+		unsigned int _size = other.size;
+		glCreateBuffers(1, &buffer); //generate and initalize our buffer
+		glNamedBufferData(buffer, _size, (void*)0, GL_STATIC_DRAW); //populate our buffer with empty data
+		glCopyNamedBufferSubData(other.buffer, buffer, 0, 0, _size); //copy other.buffer into buffer
 		size = _size;
 	}
 
@@ -663,6 +671,24 @@ public:
 		glBindVertexArray(0); //..
 	}
 
+	GLObject(const GLObject& other)
+	{
+		attribBuffer = new GLBuffer(*other.attribBuffer); //create vertex attribute buffer
+		triCount = other.triCount;
+		indexCount = 0;
+		if (other.indexBuffer != nullptr)
+		{
+			indexBuffer = new GLBuffer(*other.indexBuffer); //create vertex index buffer
+			indexCount = other.indexCount;
+		}
+		glGenVertexArrays(1, &object); //..
+		glBindVertexArray(object); //..
+		glBindBuffer(GL_ARRAY_BUFFER, attribBuffer->GetBuffer()); //..
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->GetBuffer()); //bind the index buff to VAO
+		SetupAttributes(); //..
+		glBindVertexArray(0); //..
+	}
+
 	~GLObject()
 	{
 		delete attribBuffer; //delete buffers
@@ -712,6 +738,11 @@ public:
 	DrawableObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, void* attribData, unsigned int attribSize)
 		:Object(pos, _rot, scale) {
 		renderObject = new GLObject(attribData, attribSize);
+	}
+
+	DrawableObject(const DrawableObject& other)
+	{
+		renderObject = new GLObject(*other.renderObject);
 	}
 
 	DrawableObject()
@@ -831,8 +862,6 @@ public:
 					glm::vec2(mesh->mTextureCoords[0][vert].x, mesh->mTextureCoords[0][vert].y) };
 				vertices[vert] = vertex;
 			}
-			int abba = sizeof(glm::vec3);
-			int baab = sizeof(float) * 3;
 			unsigned int numFaces = mesh->mNumFaces; //get number of faces
 			unsigned int* faces = new unsigned int[numFaces * 3]; //3 indices per face
 			for (unsigned int face = 0; face < numFaces; face++) //loop over faces
@@ -851,10 +880,8 @@ public:
 					return; //fail not a triangle
 				}
 			}
-			int a = numVerts * sizeof(Vertex);
-			int b = numFaces * 3 * sizeof(unsigned int);
 			//init the DrawableObject
-			DrawableObject::InitializeRenderObject(vertices, a, faces, b);
+			DrawableObject::InitializeRenderObject(vertices, numVerts * sizeof(Vertex), faces, numFaces * 3 * sizeof(unsigned int));
 			//init the drawable object pos rot scale
 			glm::vec3 matScale;
 			glm::quat matRot;
@@ -881,6 +908,12 @@ public:
 		}
 	}
 	
+	Mesh(const Mesh& other)
+		:DrawableObject(other)
+	{
+		complete = other.complete;
+	}
+
 	bool IsComplete()
 	{
 		return complete;
@@ -890,17 +923,16 @@ public:
 class Model: public Object
 {
 protected:
-	bool owner;
 	Mesh** meshes = nullptr;
 	unsigned int numMeshes = 0;
 
 public:
+	Model(const Model&) = delete;
 	Model(const char* path, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale)
 	{
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(path,
 			aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_GenSmoothNormals); //load scene
-		owner = true;
 		if (scene == nullptr)
 		{
 			std::cout << "Failed to make Model: Failed to load Scene at " << path << "\n";
@@ -934,26 +966,33 @@ public:
 		}
 	}
 
-	Model(Model* modelPtr)
-	{
-		owner = false;
-		meshes = modelPtr->GetMeshes();
-		numMeshes = modelPtr->GetNumMeshes();
+	Model(Model& other, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale) {
+		numMeshes = other.numMeshes;
+		meshes = new Mesh* [numMeshes];
+		for (unsigned int i = 0; i < numMeshes; i++)
+		{
+			meshes[i] = new Mesh(*other.meshes[i]);
+		}
+		//undo inital positioning of other model (essentially moving it to 0, 0, 0)
+		this->Move(-glm::vec3(other.x, other.y, other.z));
+		this->Rotate(glm::quat(other.rot[0], -other.rot[1], -other.rot[2], -other.rot[3]));
+		this->Scale(glm::vec3(1.0f) / glm::vec3(width, height, length));
+		//initally position this model
+		this->Move(_pos);
+		this->Rotate(_rot);
+		this->Scale(_scale);
 	}
 
 	~Model()
 	{
-		if (owner) //if we own meshes
+		if (numMeshes > 0 && meshes != nullptr)
 		{
-			if (numMeshes > 0 && meshes != nullptr)
+			for (unsigned int i = 0; i < numMeshes; i++)
 			{
-				for (unsigned int i = 0; i < numMeshes; i++)
-				{
-					delete meshes[i];
-				}
+				delete meshes[i];
 			}
-			delete[] meshes;
 		}
+		delete[] meshes;
 	}
 
 	void TraverseNode(aiNode* node, const aiScene* scene, aiMatrix4x4 cumulativeTransform) //depthwise node search
@@ -1000,14 +1039,14 @@ public:
 		return meshes;
 	}
 
-	unsigned int GetNumMeshes()
+	const unsigned int GetNumMeshes()
 	{
 		return numMeshes;
 	}
 
 	void Move(glm::vec3 amt)
 	{
-		for (int i = 0; i < numMeshes; i++)
+		for (unsigned int i = 0; i < numMeshes; i++)
 		{
 			meshes[i]->Move(amt);
 		}
@@ -1015,7 +1054,7 @@ public:
 
 	void Scale(glm::vec3 amt)
 	{
-		for (int i = 0; i < numMeshes; i++)
+		for (unsigned int i = 0; i < numMeshes; i++)
 		{
 			meshes[i]->Scale(amt);
 		}
@@ -1023,7 +1062,7 @@ public:
 
 	void Rotate(glm::quat amt)
 	{
-		for (int i = 0; i < numMeshes; i++)
+		for (unsigned int i = 0; i < numMeshes; i++)
 		{
 			meshes[i]->Rotate(amt);
 		}
@@ -1057,15 +1096,14 @@ protected:
 
 public:
 	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		Model* modelPtr)
-	:Model(modelPtr) {
+		const char* path)
+	:Model(path, pos, _rot, scale) {
 		CreatePBody(materialProperties);
 	}
 
 	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		const char* path)
-	:Model(path, pos, _rot, scale) {
-		CreatePBody(materialProperties);
+		Model& otherModel): Model(otherModel, pos, _rot, scale)
+	{
 	}
 
 	~PhysicsObject()
@@ -1103,14 +1141,19 @@ public:
 	}
 };
 
-/*class Player : public PhysicsObject
+class Player : public PhysicsObject
 {
 	glm::vec2 moveDir;
 
-	Player()
+	Player(glm::vec3 _pos, glm::quat _rot, Model& model)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.0f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
 	{
 	}
-};*/
+	Player(glm::vec3 _pos, glm::quat _rot, const char* path)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.0f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
+	{
+	}
+};
 
 void KeyDown(SDL_KeyboardEvent key)
 {

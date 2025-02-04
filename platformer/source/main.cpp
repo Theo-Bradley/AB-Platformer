@@ -63,8 +63,6 @@ float cube[] = {
 	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f
 };
 
-PhysicsObject* testObj;
-PhysicsObject* test2Obj;
 Shader* testShader;
 Shader* outlineShader;
 File* testFile;
@@ -87,7 +85,9 @@ int main(int argc, char** argv)
 	PxRigidStatic* plane = PxCreatePlane(*pPhysics, PxPlane(PxVec3(0.00f, -1.00f, 0.00f), PxVec3(0.00f, 1.00f, 0.00f)), *planeMat);
 	pScene->addActor(*plane);
 
-	testModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
+	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
+	testModel = new Model(*copyModel, glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(12.0f), 0.0f)), glm::vec3(1.0f));
+	delete copyModel;
 	
 	eTime = SDL_GetTicks();
 
