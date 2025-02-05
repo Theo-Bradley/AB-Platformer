@@ -560,7 +560,20 @@ public:
 		glUniform2f(glGetUniformLocation(program, "screenSize"), glm::floor(screenWidth), glm::floor(screenHeight));
 		glUniform1i(glGetUniformLocation(program, "shadowMap"), 2);
 		glUniform1i(glGetUniformLocation(program, "depthMap"), 3);
+		glUseProgram(oldProgram); //activate the previously active prog
+	}
 
+	void SetUniforms(glm::mat4 sunMatrix, glm::vec3 sunPos)
+	{
+		glm::uint oldProgram = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&oldProgram)); //get the active program
+		glUseProgram(program); //use our prog
+		glUniformMatrix4fv(glGetUniformLocation(program, "matrix"), 1, false, glm::value_ptr(mainCamera->GetCombinedMatrix())); //set the uniforms
+		glUniform2f(glGetUniformLocation(program, "screenSize"), glm::floor(screenWidth), glm::floor(screenHeight));
+		glUniform1i(glGetUniformLocation(program, "shadowMap"), 2);
+		glUniform1i(glGetUniformLocation(program, "depthMap"), 3);
+		glUniformMatrix4fv(glGetUniformLocation(program, "sunMatrix"), 1, false, glm::value_ptr(sunMatrix)); //set the uniforms
+		glUniform3f(glGetUniformLocation(program, "sunPos"), sunPos.x, sunPos.y, sunPos.z);
 
 		glUseProgram(oldProgram); //activate the previously active prog
 	}
@@ -1351,14 +1364,13 @@ public:
 	}
 };
 
-class Light
+class Light : public Object
 {
 };
 
 class Sun: public Light
 {
 protected:
-	glm::vec3 pos;
 	float strength;
 	GLFramebuffer* shadowBuffer;
 	const int shadowMapSize = 2048;
@@ -1369,6 +1381,7 @@ public:
 		pos = _pos;
 		strength = 100.00f;
 		shadowBuffer = new GLFramebuffer(shadowMapSize, shadowMapSize);
+		shadowBuffer->GetDepth()->Use(2);
 	}
 
 	glm::mat4 CalculateCombinedMatrix()
@@ -1384,9 +1397,11 @@ public:
 	{
 		glCullFace(GL_FRONT);
 		shader->Use();
-		glUniformMatrix4fv(glGetUniformLocation(shader->GetProgram(), "sunMatrix"), 1, false, glm::value_ptr(CalculateCombinedMatrix()));
+		//glUniformMatrix4fv(glGetUniformLocation(shader->GetProgram(), "sunMatrix"), 1, false, glm::value_ptr(CalculateCombinedMatrix()));
+		shader->SetUniforms(CalculateCombinedMatrix(), pos);
 		glViewport(0, 0, shadowMapSize, shadowMapSize);
 		shadowBuffer->Use();
+		glClear(GL_DEPTH_BUFFER_BIT);
 	}
 
 	void EndShadowPass()

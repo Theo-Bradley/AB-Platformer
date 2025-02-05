@@ -77,8 +77,6 @@ int main(int argc, char** argv)
 
 	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
 	testShader->SetUniforms();
-	outlineShader = new Shader(Path("outline.vert").c_str(), Path("outline.frag").c_str());
-	outlineShader->SetUniforms();
 
 	PxMaterial* planeMat = pPhysics->createMaterial(0.50f, 0.40f, 0.90f);
 	PxRigidStatic* plane = PxCreatePlane(*pPhysics, PxPlane(PxVec3(0.00f, -1.00f, 0.00f), PxVec3(0.00f, 1.00f, 0.00f)), *planeMat);
@@ -175,9 +173,11 @@ int init()
 	pScene = pPhysics->createScene(sceneDesc); //create the scene
 
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
 	errorShader = new Shader(true);
 	errorShader->Use();
 	shadowShader = new Shader(Path("shadow.vert").c_str(), Path("basic.frag").c_str());
+	outlineShader = new Shader(Path("outline.vert").c_str(), Path("outline.frag").c_str());
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
 	depthBuffer->GetDepth()->Use(3);
@@ -218,7 +218,6 @@ void Draw()
 	player->Draw();
 
 	testSun->StartShadowPass(shadowShader);
-	glClear(GL_DEPTH_BUFFER_BIT);
 	obj1->Draw();
 	player->Draw();
 	testSun->EndShadowPass();
@@ -226,7 +225,7 @@ void Draw()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	outlineShader->Use();
-	outlineShader->SetUniforms();
+	outlineShader->SetUniforms(testSun->CalculateCombinedMatrix(), testSun->GetPosition());
 	obj1->Draw();
 	if (player != nullptr)
 		player->Draw();
