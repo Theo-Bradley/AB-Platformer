@@ -139,6 +139,7 @@ unsigned long long dTime = 1;
 float screenWidth, screenHeight;
 float sensitivity = 0.66f;
 Player* player;
+Shader* shadowShader;
 
 Key k_Forward = Key(key_Forward);
 Key k_Left = Key(key_Left);
@@ -1360,11 +1361,11 @@ protected:
 	glm::vec3 pos;
 	float strength;
 	GLFramebuffer* shadowBuffer;
+	const int shadowMapSize = 2048;
 
 public:
 	Sun(glm::vec3 _pos)
 	{
-		const int shadowMapSize = 2048;
 		pos = _pos;
 		strength = 100.00f;
 		shadowBuffer = new GLFramebuffer(shadowMapSize, shadowMapSize);
@@ -1384,11 +1385,14 @@ public:
 		glCullFace(GL_FRONT);
 		shader->Use();
 		glUniformMatrix4fv(glGetUniformLocation(shader->GetProgram(), "sunMatrix"), 1, false, glm::value_ptr(CalculateCombinedMatrix()));
+		glViewport(0, 0, shadowMapSize, shadowMapSize);
+		shadowBuffer->Use();
 	}
 
 	void EndShadowPass()
 	{
 		glCullFace(GL_BACK);
+		glViewport(0, 0, (int)screenWidth, (int)screenHeight);
 	}
 };
 

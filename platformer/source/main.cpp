@@ -68,6 +68,7 @@ Shader* outlineShader;
 File* testFile;
 Model* testModel;
 PhysicsObject* obj1;
+Sun* testSun;
 
 int main(int argc, char** argv)
 {
@@ -86,6 +87,8 @@ int main(int argc, char** argv)
 	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	obj1 = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, *copyModel);
 	delete copyModel;
+
+	testSun = new Sun(glm::vec3(-1.00f, 5.00f, -1.00f));
 	
 	eTime = SDL_GetTicks();
 
@@ -174,6 +177,7 @@ int init()
 	glEnable(GL_DEPTH_TEST);
 	errorShader = new Shader(true);
 	errorShader->Use();
+	shadowShader = new Shader(Path("shadow.vert").c_str(), Path("basic.frag").c_str());
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
 	depthBuffer->GetDepth()->Use(3);
@@ -212,6 +216,12 @@ void Draw()
 	testShader->SetUniforms();
 	obj1->Draw();
 	player->Draw();
+
+	testSun->StartShadowPass(shadowShader);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	obj1->Draw();
+	player->Draw();
+	testSun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
