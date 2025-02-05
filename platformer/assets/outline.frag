@@ -5,7 +5,7 @@
 
 out vec4 color;
 
-uniform sampler2D depth;
+uniform sampler2D depthMap;
 uniform float lineThickness = 4;
 uniform float depthThresh = 0.1;
 uniform vec2 screenSize;
@@ -29,10 +29,10 @@ void main()
 	vec2 uvBR = screenPos + vec2(plusOffset * 1.0/screenSize.x, minusOffset * 1.0/screenSize.y); //.. br
 	vec2 uvTL = screenPos + vec2(minusOffset * 1.0/screenSize.x, plusOffset * 1.0/screenSize.y); //.. tl
 	vec2 uvTR = screenPos + vec2(plusOffset * 1.0/screenSize.x, plusOffset* 1.0/screenSize.y); //.. tr
-	float dBL = linearize_depth(texture(depth, uvBL).r); //sample the depth buffer in each offset and linearize it for consistent difference irrespective of depth
-	float dBR = linearize_depth(texture(depth, uvBR).r); //..
-	float dTL = linearize_depth(texture(depth, uvTL).r); //..
-	float dTR = linearize_depth(texture(depth, uvTR).r); //..
+	float dBL = linearize_depth(texture(depthMap, uvBL).r); //sample the depth buffer in each offset and linearize it for consistent difference irrespective of depth
+	float dBR = linearize_depth(texture(depthMap, uvBR).r); //..
+	float dTL = linearize_depth(texture(depthMap, uvTL).r); //..
+	float dTR = linearize_depth(texture(depthMap, uvTR).r); //..
 	float depthDiff = length(vec2(dBL - dTR, dBR - dTL)); //get overall difference between points
 	depthDiff = depthDiff > depthThresh ? 1.0 : 0.0;
 	color = vec4(fma(outlineColor, vec3(depthDiff), baseColor * (1.0 - depthDiff)), 1.0);

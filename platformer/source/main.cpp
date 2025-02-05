@@ -217,7 +217,6 @@ void Draw()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	outlineShader->Use();
 	outlineShader->SetUniforms();
-	glUniform1i(glGetUniformLocation(outlineShader->GetProgram(), "depth"), 3);
 	obj1->Draw();
 	if (player != nullptr)
 		player->Draw();

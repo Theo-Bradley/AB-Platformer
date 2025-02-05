@@ -557,6 +557,9 @@ public:
 		glUseProgram(program); //use our prog
 		glUniformMatrix4fv(glGetUniformLocation(program, "matrix"), 1, false, glm::value_ptr(mainCamera->GetCombinedMatrix())); //set the uniforms
 		glUniform2f(glGetUniformLocation(program, "screenSize"), glm::floor(screenWidth), glm::floor(screenHeight));
+		glUniform1i(glGetUniformLocation(program, "shadowMap"), 2);
+		glUniform1i(glGetUniformLocation(program, "depthMap"), 3);
+
 
 		glUseProgram(oldProgram); //activate the previously active prog
 	}
@@ -663,7 +666,7 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, internalFormat, format, (void*)NULL); //allocate memory
 		glActiveTexture(oldTexture);
-		GLFormat = format;
+		GLFormat = internalFormat;
 		successful = true;
 		PrintGLErrors();
 	}
@@ -683,7 +686,7 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, (void*)NULL); //allocate memory
 		glActiveTexture(oldTexture);
-		GLFormat = format;
+		GLFormat = internalFormat;
 		successful = true;
 		PrintGLErrors();
 	}
@@ -717,6 +720,24 @@ public:
 		glGenFramebuffers(1, &framebuffer);
 		color = new Texture((int)screenWidth, (int)screenHeight, GL_RGB, GL_UNSIGNED_BYTE);
 		depth = new Texture((int)screenWidth, (int)screenHeight, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
+		unsigned int oldFramebuffer = 0;
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color->GetTexture(), 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth->GetTexture(), 0);
+		int completeness = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (completeness != GL_FRAMEBUFFER_COMPLETE)
+		{
+			std::cout << "Framebuffer Depth Completeness: 0x" << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << "\n";
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
+	}
+
+	GLFramebuffer(int width, int height)
+	{
+		glGenFramebuffers(1, &framebuffer);
+		color = new Texture(width, height, GL_RGB, GL_UNSIGNED_BYTE);
+		depth = new Texture(width, height, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
 		unsigned int oldFramebuffer = 0;
 		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -1329,13 +1350,6 @@ public:
 	}
 };
 
-struct SunData
-{
-	glm::vec3 pos;
-	glm::vec3 direction;
-	float strength;
-};
-
 class Light
 {
 };
@@ -1343,11 +1357,38 @@ class Light
 class Sun: public Light
 {
 protected:
-	SunData sunData;
+	glm::vec3 pos;
+	float strength;
+	GLFramebuffer* shadowBuffer;
 
 public:
-	Sun()
+	Sun(glm::vec3 _pos)
 	{
+		const int shadowMapSize = 2048;
+		pos = _pos;
+		strength = 100.00f;
+		shadowBuffer = new GLFramebuffer(shadowMapSize, shadowMapSize);
+	}
+
+	glm::mat4 CalculateCombinedMatrix()
+	{
+		const float nearPlane = 1.00f;
+		const float farPlane = 15.00f;
+		glm::mat4 projection = glm::ortho(-10.00f, 10.00f, -10.00f, 10.00f, nearPlane, farPlane);
+		glm::mat4 view = glm::lookAt(pos, glm::vec3(0.00f), glm::vec3(0.00f, 1.00f, 0.00f));
+		return projection * view;
+	}
+
+	void StartShadowPass(Shader* shader)
+	{
+		glCullFace(GL_FRONT);
+		shader->Use();
+		glUniformMatrix4fv(glGetUniformLocation(shader->GetProgram(), "sunMatrix"), 1, false, glm::value_ptr(CalculateCombinedMatrix()));
+	}
+
+	void EndShadowPass()
+	{
+		glCullFace(GL_BACK);
 	}
 };
 
