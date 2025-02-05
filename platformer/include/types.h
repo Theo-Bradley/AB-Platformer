@@ -1386,7 +1386,7 @@ public:
 
 	glm::mat4 CalculateCombinedMatrix()
 	{
-		const float nearPlane = 1.00f;
+		const float nearPlane = 0.10f;
 		const float farPlane = 15.00f;
 		glm::mat4 projection = glm::ortho(-10.00f, 10.00f, -10.00f, 10.00f, nearPlane, farPlane);
 		glm::mat4 view = glm::lookAt(pos, glm::vec3(0.00f), glm::vec3(0.00f, 1.00f, 0.00f));

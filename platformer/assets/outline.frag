@@ -4,6 +4,8 @@
 //to make better, read the fixing artefacts section (about viewangle)
 
 in vec4 sunFragPos;
+in vec3 normal;
+in vec3 position;
 out vec4 color;
 
 uniform sampler2D depthMap;
@@ -24,13 +26,11 @@ float linearize_depth(float d)
 } //Code from: https://stackoverflow.com/questions/51108596/linearize-depth
 
 float SunShadow()
-{
-	//float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005); //depth bias to avoid shadow acne
-	float bias = 0.01;
+{ //adapted from https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping
+	float bias = max(0.0005 * (1.0 - dot(normal, normalize(position - sunPos))), 0.00005); //depth bias to avoid shadow acne
 	vec3 coord = sunFragPos.xyz / sunFragPos.w;
 	coord = coord * 0.5 + 0.5; //convert NDC to tex coords
 	float closestDepth = texture(shadowMap, coord.xy).x; //get the depth from the shadow map
-	//float closestDepth = 1.0;
 	float result = coord.z + bias > closestDepth ? 0.0 : 1.0; //if the current depth is closer than closest depth then its not in shadow
 	return result;
 }
