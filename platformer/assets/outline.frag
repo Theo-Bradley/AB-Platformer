@@ -7,7 +7,7 @@ out vec4 color;
 
 uniform sampler2D depth;
 uniform float lineThickness = 4;
-uniform float depthThresh = 0.15;
+uniform float depthThresh = 0.1;
 uniform vec2 screenSize;
 uniform float zNear = 0.1;
 uniform float zFar = 5.0;

@@ -646,7 +646,7 @@ public:
 		stbi_image_free(imageData);
 	}
 
-	Texture(int _width, int _height, GLenum format, GLenum internalFormat)
+	Texture(int _width, int _height, GLenum internalFormat, GLenum format)
 	{
 		width = _width;
 		height = _height;
@@ -659,7 +659,27 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); //..
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, internalFormat, (void*)NULL); //allocate memory
+		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, internalFormat, format, (void*)NULL); //allocate memory
+		glActiveTexture(oldTexture);
+		GLFormat = format;
+		successful = true;
+		PrintGLErrors();
+	}
+
+	Texture(int _width, int _height, GLenum internalFormat, GLenum format, GLenum type)
+	{
+		width = _width;
+		height = _height;
+		unsigned int oldTexture = 0;
+		glGetIntegerv(GL_ACTIVE_TEXTURE, reinterpret_cast<int*>(&oldTexture));
+		glActiveTexture(GL_TEXTURE8); //select texture unit 8 (we have this reserved for creating textures)
+		glGenTextures(1, &texture); //gen empty tex
+		glBindTexture(GL_TEXTURE_2D, texture); //bind it
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); //set wrapping values
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); //..
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, (void*)NULL); //allocate memory
 		glActiveTexture(oldTexture);
 		GLFormat = format;
 		successful = true;
@@ -695,7 +715,7 @@ public:
 	{
 		glGenFramebuffers(1, &framebuffer);
 		color = new Texture((int)screenWidth, (int)screenHeight, GL_RGB, GL_UNSIGNED_BYTE);
-		depth = new Texture((int)screenWidth, (int)screenHeight, GL_DEPTH_COMPONENT, GL_FLOAT);
+		depth = new Texture((int)screenWidth, (int)screenHeight, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
 		unsigned int oldFramebuffer = 0;
 		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -1278,7 +1298,7 @@ class Player : public PhysicsObject
 {
 protected:
 	glm::vec2 moveDir = glm::vec2(0.00f);
-	float moveSpeed = 10.00f; //max movement speed
+	float moveSpeed = 6.67f; //max movement speed
 	float moveTime = 0.50f; //time to get to moveSpeed
 
 public:
