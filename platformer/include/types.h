@@ -510,6 +510,8 @@ public:
 
 		glDeleteShader(vertexShader); //cleanup shaders as they are contained in the program
 		glDeleteShader(fragmentShader); //..
+		delete vertexFile;
+		delete fragmentFile;
 	}
 
 	Shader(bool isErrorShader)
