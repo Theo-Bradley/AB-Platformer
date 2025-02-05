@@ -691,10 +691,9 @@ public:
 		glDeleteTextures(1, &texture);
 	}
 
-	void Use(GLenum unit)
+	void Use(int unit)
 	{
-		glActiveTexture(unit);
-		glBindTexture(GL_TEXTURE_2D, texture);
+		glBindTextureUnit(unit, texture);
 	}
 
 	unsigned int GetTexture()
@@ -1325,6 +1324,28 @@ public:
 		glm::vec2 f = pBody->getMass() * (v - u) / moveTime;
 		pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply force
 		PhysicsObject::Update();
+	}
+};
+
+struct SunData
+{
+	glm::vec3 pos;
+	glm::vec3 direction;
+	float strength;
+};
+
+class Light
+{
+};
+
+class Sun: public Light
+{
+protected:
+	SunData sunData;
+
+public:
+	Sun()
+	{
 	}
 };
 

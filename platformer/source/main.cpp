@@ -176,6 +176,7 @@ int init()
 	errorShader->Use();
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
+	depthBuffer->GetDepth()->Use(3);
 
 	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), *copyModel);
@@ -217,7 +218,6 @@ void Draw()
 	outlineShader->Use();
 	outlineShader->SetUniforms();
 	glUniform1i(glGetUniformLocation(outlineShader->GetProgram(), "depth"), 3);
-	glBindTextureUnit(3, depthBuffer->GetDepth()->GetTexture());
 	obj1->Draw();
 	if (player != nullptr)
 		player->Draw();
