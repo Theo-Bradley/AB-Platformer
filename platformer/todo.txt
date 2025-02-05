@@ -1,2 +1,3 @@
 change outline shader screenSize to be a call to textureSize
 replace current SunShadow func with shader from https://github.com/Theo-Bradley/Supermaket-Scramble/blob/master/proj/game/Assets/Shaders/s_FragmentToon.frag
+Maybe anti alias the shadow map?????
