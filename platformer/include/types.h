@@ -705,6 +705,29 @@ public:
 		PrintGLErrors();
 	}
 
+	Texture(int _width, int _height, bool multisample, GLenum internalFormat, GLenum format, GLenum type)
+	{
+		if (multisample)
+		{
+			width = _width;
+			height = _height;
+			unsigned int oldTexture = 0;
+			glGetIntegerv(GL_ACTIVE_TEXTURE, reinterpret_cast<int*>(&oldTexture));
+			glActiveTexture(GL_TEXTURE8); //select texture unit 8 (we have this reserved for creating textures)
+			glGenTextures(1, &texture); //gen empty tex
+			glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, texture); //bind it
+			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); //set wrapping values
+			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); //..
+			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAX_LEVEL, 0);
+			glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, internalFormat, width, height, false); //allocate memory
+			glActiveTexture(oldTexture);
+			GLFormat = internalFormat;
+		}
+		else
+			Texture::Texture(_width, _height, internalFormat, format, type);
+	}
+
 	~Texture()
 	{
 		glDeleteTextures(1, &texture);
@@ -727,6 +750,7 @@ protected:
 	unsigned int framebuffer;
 	Texture* color;
 	Texture* depth;
+	int width, height;
 
 public:
 	GLFramebuffer()
@@ -734,6 +758,8 @@ public:
 		glGenFramebuffers(1, &framebuffer);
 		color = new Texture((int)screenWidth, (int)screenHeight, GL_RGB, GL_UNSIGNED_BYTE);
 		depth = new Texture((int)screenWidth, (int)screenHeight, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
+		width = (int)screenWidth;
+		height = (int)screenHeight;
 		unsigned int oldFramebuffer = 0;
 		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -747,8 +773,10 @@ public:
 		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
 	}
 
-	GLFramebuffer(int width, int height)
+	GLFramebuffer(int _width, int _height)
 	{
+		width = _width;
+		height = _height;
 		glGenFramebuffers(1, &framebuffer);
 		color = new Texture(width, height, GL_RGB, GL_UNSIGNED_BYTE);
 		depth = new Texture(width, height, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
@@ -762,6 +790,28 @@ public:
 		{
 			std::cout << "Framebuffer Depth Completeness: 0x" << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << "\n";
 		}
+		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
+	}
+
+	GLFramebuffer(int width, int height, bool multisample)
+	{
+		unsigned int oldFramebuffer = 0;
+		if (multisample)
+		{
+			glGenFramebuffers(1, &framebuffer);
+			color = new Texture(width, height, true, GL_RGB, GL_UNSIGNED_BYTE);
+			depth = new Texture(width, height, true, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
+			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
+			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, color->GetTexture(), 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D_MULTISAMPLE, depth->GetTexture(), 0);
+			int completeness = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			if (completeness != GL_FRAMEBUFFER_COMPLETE)
+			{
+				std::cout << "Framebuffer Depth Completeness: 0x" << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << "\n";
+			}
+		}
+		GLFramebuffer(width, height);
 		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
 	}
 
@@ -783,6 +833,36 @@ public:
 	Texture* GetDepth()
 	{
 		return depth;
+	}
+
+	unsigned int GetFramebuffer()
+	{
+		return framebuffer;
+	}
+};
+
+class GLFramebufferMS: public GLFramebuffer
+{
+protected:
+	GLFramebuffer* multisampleBuffer;
+	
+public:
+	GLFramebufferMS(int _width, int _height)
+		:GLFramebuffer(_width, _height)
+	{
+		multisampleBuffer = new GLFramebuffer(_width, _height, true);
+	}
+
+	void Use()
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, multisampleBuffer->GetFramebuffer());
+	}
+
+	void Downsample()
+	{
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, multisampleBuffer->GetFramebuffer());
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+		glBlitFramebuffer();
 	}
 };
 

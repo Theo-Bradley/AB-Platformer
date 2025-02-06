@@ -182,6 +182,8 @@ int init()
 	depthBuffer = new GLFramebuffer();
 	depthBuffer->GetDepth()->Use(3);
 
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+
 	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), *copyModel);
 
@@ -217,6 +219,7 @@ void Draw()
 	obj1->Draw();
 	player->Draw();
 
+	glEnable(GL_MULTISAMPLE);
 	testSun->StartShadowPass(shadowShader);
 	obj1->Draw();
 	player->Draw();
