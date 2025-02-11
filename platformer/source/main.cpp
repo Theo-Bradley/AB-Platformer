@@ -69,6 +69,7 @@ File* testFile;
 Model* testModel;
 PhysicsObject* obj1;
 Sun* testSun;
+StaticObject* groundPlane;
 
 int main(int argc, char** argv)
 {
@@ -78,12 +79,13 @@ int main(int argc, char** argv)
 	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
 	testShader->SetUniforms();
 
-	PxMaterial* planeMat = pPhysics->createMaterial(0.50f, 0.40f, 0.90f);
+	/*PxMaterial* planeMat = pPhysics->createMaterial(0.50f, 0.40f, 0.90f);
 	PxRigidStatic* plane = PxCreatePlane(*pPhysics, PxPlane(PxVec3(0.00f, -1.00f, 0.00f), PxVec3(0.00f, 1.00f, 0.00f)), *planeMat);
-	pScene->addActor(*plane);
+	pScene->addActor(*plane);*/
 
-	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
-	obj1 = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, *copyModel);
+	Model* copyModel = new Model(Path("models/cube.obj").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
+	obj1 = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, copyModel);
+	groundPlane = new StaticObject(glm::vec3(0.0f, -1.00f, 0.00f), glm::quat(glm::vec3(0.0f)), glm::vec3(6.60f, 1.00f, 5.50f), MaterialProperties(0.50f, 0.40f, 0.90f), copyModel);
 	delete copyModel;
 
 	testSun = new Sun(glm::vec3(-1.00f, 5.00f, -1.00f));
@@ -184,8 +186,7 @@ int init()
 
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
-	Model* copyModel = new Model(Path("models/cube.fbx").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
-	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), *copyModel);
+	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), Path("models/cube.obj").c_str());
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -218,11 +219,13 @@ void Draw()
 	testShader->SetUniforms();
 	obj1->Draw();
 	player->Draw();
+	groundPlane->Draw();
 
 	glEnable(GL_MULTISAMPLE);
 	testSun->StartShadowPass(shadowShader);
 	obj1->Draw();
 	player->Draw();
+	groundPlane->Draw();
 	testSun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -230,6 +233,7 @@ void Draw()
 	outlineShader->Use();
 	outlineShader->SetUniforms(testSun->CalculateCombinedMatrix(), testSun->GetPosition());
 	obj1->Draw();
+	//groundPlane->Draw();
 	if (player != nullptr)
 		player->Draw();
 

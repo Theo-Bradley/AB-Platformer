@@ -8,8 +8,6 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
-#define GLM_ENABLE_EXPERIMENTAL
-#include "glm/gtx/matrix_decompose.hpp"
 #include "PhysX/PxPhysicsAPI.h"
 #define STB_IMAGE_IMPLEMENTATION
 #ifdef WINDOWS
@@ -60,7 +58,8 @@ public:
 	virtual void reportError(PxErrorCode::Enum code, const char* message, const char* file, int line)
 	{
 		// error processing implementation
-		std::cout << std::dec << "PhysX Error: " << code << ": " << message << " in " << file << " at " << line << "\n";
+		std::cout << std::dec << "PhysX Error: " << code << ": " << message << " in " << file << " at " << line << "\nPress Enter to exit!";
+		std::getchar();
 		switch (code)
 		{
 		case PxErrorCode::eABORT:
@@ -185,6 +184,11 @@ PxQuat FromGLMQuat(glm::quat from)
 	return PxQuat(from.x, from.y, from.z, from.w);
 }
 
+glm::quat FromAssimpQuat(aiQuaternion from)
+{
+	return glm::quat(from.w, from.x, from.y, from.z);
+}
+
 //effectively transposes the aiMatrix4x4 into a glm::mat4
 glm::mat4 FromAssimpMat(aiMatrix4x4 _mat)
 {
@@ -237,43 +241,28 @@ class Object
 protected:
 	glm::vec3 pos;
 	glm::quat rot = glm::quat(1.00f, 0.00f, 0.00f, 0.00f);
-	float width, length, height;
+	glm::vec3 scal;
 
 public:
 	Object()
 	{
 		pos = glm::vec3(0.00f);
 		rot = glm::quat(1.00f, 0.00f, 0.00f, 0.00f);
-		width = 1.00f;
-		length = 1.00f;
-		height = 1.00f;
-	}
-
-	Object(float _x, float _y, float _z, float _pitch, float _yaw, float _roll, float _width, float _length, float _height)
-	{
-		pos = glm::vec3(_x, _y, _z);
-		rot = glm::quat(glm::vec3(_pitch, _yaw, _roll));
-		width = _width;
-		length = _length;
-		height = _height;
+		scal = glm::vec3(1.00f);
 	}
 
 	Object(glm::vec3 _pos, glm::quat _rot, glm::vec3 scale)
 	{
 		pos = _pos;
 		rot = _rot;
-		width = scale.x;
-		height = scale.y;
-		length = scale.z;
+		scal = scale;
 	}
 
 	Object(PxVec3 _pos, PxQuat _rot, PxVec3 scale)
 	{
 		pos = FromPxVec(_pos);
-		rot = glm::quat(_rot.w, _rot.x, _rot.y, _rot.z);
-		width = scale.x;
-		height = scale.y;
-		length = scale.z;
+		rot = FromPxQuat(_rot);
+		scal = FromPxVec(scale);
 	}
 
 	virtual void Move(glm::vec3 amt)
@@ -283,9 +272,9 @@ public:
 
 	virtual void Scale(glm::vec3 amt)
 	{
-		width *= amt.x;
-		length *= amt.y;
-		height *= amt.z;
+		scal.x *= amt.x;
+		scal.y *= amt.y;
+		scal.z *= amt.z;
 	}
 
 	virtual void Rotate(glm::quat _quat)
@@ -305,9 +294,9 @@ public:
 
 	virtual void SetScale(glm::vec3 val)
 	{
-		width = val.x;
-		height = val.y;
-		length = val.z;
+		scal.x = val.x;
+		scal.y = val.y;
+		scal.z = val.z;
 	}
 
 	virtual glm::vec3 GetPosition()
@@ -322,7 +311,7 @@ public:
 
 	virtual glm::vec3 GetScale()
 	{
-		return glm::vec3(width, height, length);
+		return scal;
 	}
 };
 
@@ -1034,9 +1023,7 @@ public:
 		renderObject = new GLObject(*other.renderObject);
 		pos = other.pos;
 		rot = other.rot;
-		width = other.width;
-		height = other.height;
-		length = other.length;
+		scal = other.scal;
 	}
 
 	DrawableObject()
@@ -1058,7 +1045,7 @@ public:
 	{
 		glm::mat4 translate = glm::translate(glm::mat4(1.00f), pos);
 		glm::mat4 rotate = glm::mat4_cast(rot);
-		glm::mat4 scale = glm::scale(glm::mat4(1.00f), glm::vec3(width, height, length));
+		glm::mat4 scale = glm::scale(glm::mat4(1.00f), scal);
 		return translate * rotate * scale;
 	}
 
@@ -1092,6 +1079,10 @@ public:
 	Mesh(aiMesh* mesh, aiMatrix4x4 globalTransform)
 	{
 		glm::mat4 transform = FromAssimpMat(globalTransform);//get global transform
+		aiVector3f globalPos;
+		aiQuaternion globalRot;
+		aiVector3f globalScale;
+		globalTransform.Decompose(globalScale, globalRot, globalPos);
 		unsigned int numVerts = mesh->mNumVertices;
 		if (numVerts > 0)
 		{
@@ -1124,11 +1115,11 @@ public:
 			//init the DrawableObject
 			DrawableObject::InitializeRenderObject(vertices, numVerts * sizeof(Vertex), faces, numFaces * 3 * sizeof(unsigned int));
 			//init the drawable object pos rot scale
-			glm::vec3 matSkew;
-			glm::vec4 matProj;
-			glm::decompose(transform, parentScale, parentRotation, parentPosition, matSkew, matProj); //get pos rot scale from transform matrix
+			parentPosition = FromAssimpVec(globalPos);
+			parentRotation = FromAssimpQuat(globalRot);
+			//parentRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+			parentScale = FromAssimpVec(globalScale);
 			DrawableObject::SetPosition(parentPosition); //set position from matrix
-			parentRotation = glm::conjugate(parentRotation); //decompose returns quaternion conjugate instead of proper quaternion https://github.com/g-truc/glm/pull/1012
 			DrawableObject::SetRotation(parentRotation); //set rotation from matrix
 			DrawableObject::SetScale(parentScale); //set scale from matrix
 
@@ -1211,9 +1202,9 @@ public:
 			}
 
 			TraverseNode(node, scene, node->mTransformation); //start processing the scene
-			Model::Scale(_scale); //apply inital pos rot scale
-			Model::Rotate(_rot);
-			Model::Move(_pos);
+			Model::SetScale(_scale); //apply inital pos rot scale
+			Model::SetRotation(_rot);
+			Model::SetPosition(_pos);
 		}
 		else
 		{
@@ -1367,8 +1358,8 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(width / 2.00f, height / 2.00f, length / 2.00f), *pMaterial, true); //create the associated shape
-		PxTransform transform = PxTransform(FromGLMVec(pos), PxQuat(rot.x, rot.y, rot.z, rot.w)); //create the starting transform from the class rot and xyz
+		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
+		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
 		pBody = pPhysics->createRigidDynamic(transform); //create the dynamic rigidbody
 		pBody->attachShape(*pShape); //attatch the shape to it
 		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
@@ -1384,7 +1375,7 @@ public:
 	}
 
 	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		Model& otherModel): Model(otherModel, pos, _rot, scale)
+		Model* otherModel) : Model(*otherModel, pos, _rot, scale)
 	{
 		CreatePBody(materialProperties);
 	}
@@ -1422,6 +1413,62 @@ public:
 	}
 };
 
+class StaticObject : public Model
+{
+protected:
+	PxRigidStatic* pBody;
+	PxMaterial* pMaterial;
+
+	void CreatePBody(MaterialProperties materialProperties)
+	{
+		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
+		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
+		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
+		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
+		pBody->attachShape(*pShape); //attatch the shape to it
+		pScene->addActor(*pBody); //add rigid body to scene
+		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
+	}
+
+public:
+	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
+		const char* path)
+		:Model(path, pos, _rot, scale) {
+		CreatePBody(materialProperties);
+	}
+
+	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
+		Model* otherModel) : Model(*otherModel, pos, _rot, scale)
+	{
+		CreatePBody(materialProperties);
+	}
+
+	~StaticObject()
+	{
+		pScene->removeActor(*pBody); //remove from the scene
+		PX_RELEASE(pBody); //free the memory
+	}
+
+	virtual void Move(glm::vec3 amt)
+	{
+		Model::Move(amt);
+		PxQuat _rot = pBody->getGlobalPose().q;
+		pBody->setGlobalPose(PxTransform(FromGLMVec(pos), _rot));
+	}
+
+	virtual void Rotate(glm::quat _quat)
+	{
+		Model::Rotate(_quat);
+		PxVec3 _pos = pBody->getGlobalPose().p;
+		pBody->setGlobalPose(PxTransform(_pos, FromGLMQuat(rot)));
+	}
+
+	virtual void Scale(glm::vec3 amt)
+	{
+		Model::Scale(amt);
+	}
+};
+
 class Player : public PhysicsObject
 {
 protected:
@@ -1430,12 +1477,12 @@ protected:
 	float moveTime = 0.50f; //time to get to moveSpeed
 
 public:
-	Player(glm::vec3 _pos, glm::quat _rot, Model& model)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
+	Player(glm::vec3 _pos, glm::quat _rot, Model* model)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
 	{
 	}
 	Player(glm::vec3 _pos, glm::quat _rot, const char* path)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 2.00f, 1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
 	{
 	}
 
@@ -1446,12 +1493,12 @@ public:
 
 	void Update()
 	{	
-		glm::vec4 worldV = glm::rotate(mainCamera->GetAngle() + 0.50f * PI, glm::vec3(0.00f, 1.00f, 0.00f)) * glm::vec4(moveDir.x * moveSpeed, 0.00f, moveDir.y * -moveSpeed, 0.0);
-		glm::vec2 v = glm::vec2(worldV.x, worldV.z); //get target move speed
-		glm::vec3 current = FromPxVec(pBody->getLinearVelocity());
-		glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
-		glm::vec2 f = pBody->getMass() * (v - u) / moveTime;
-		pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply force
+		//glm::vec4 worldV = glm::rotate(rot, 0.50f * PI, glm::vec3(0.00f, 1.00f, 0.00f)) * glm::vec4(moveDir.x * moveSpeed, 0.00f, moveDir.y * -moveSpeed, 0.0);
+		//glm::vec2 v = glm::vec2(worldV.x, worldV.z); //get target move speed
+		//glm::vec3 current = FromPxVec(pBody->getLinearVelocity());
+		//glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
+		//glm::vec2 f = pBody->getMass() * (v - u) / moveTime;
+		//pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply force
 		PhysicsObject::Update();
 	}
 };
