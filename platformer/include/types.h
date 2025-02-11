@@ -51,6 +51,7 @@ class Shader;
 class Camera;
 class GLFramebuffer;
 class Player;
+class Platform;
 
 class PhysicsErrorCallback : public PxErrorCallback
 {
@@ -139,6 +140,7 @@ float screenWidth, screenHeight;
 float sensitivity = 0.66f;
 Player* player;
 Shader* shadowShader;
+Platform* groundPlane;
 
 Key k_Forward = Key(key_Forward);
 Key k_Left = Key(key_Left);
@@ -1417,17 +1419,17 @@ class StaticObject : public Model
 {
 protected:
 	PxRigidStatic* pBody;
+	PxShape* pShape;
 	PxMaterial* pMaterial;
 
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
+		pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
 		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
 		pBody->attachShape(*pShape); //attatch the shape to it
 		pScene->addActor(*pBody); //add rigid body to scene
-		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
 	}
 
 public:
@@ -1447,6 +1449,7 @@ public:
 	{
 		pScene->removeActor(*pBody); //remove from the scene
 		PX_RELEASE(pBody); //free the memory
+		PX_RELEASE(pShape);
 	}
 
 	virtual void Move(glm::vec3 amt)
@@ -1500,6 +1503,36 @@ public:
 		glm::vec2 f = pBody->getMass() * (v - u) / moveTime;
 		pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply force
 		PhysicsObject::Update();
+	}
+};
+
+class Platform
+	: public StaticObject
+{
+protected:
+	bool enabled;
+
+public:
+	Platform(glm::vec3 _pos, glm::vec3 _scale, Model* copyModel)
+		:StaticObject(_pos, glm::quat(1.00f, 0.00f, 0.00f, 0.00f), _scale, MaterialProperties{ 0.5f, 0.4f, 0.5f }, copyModel) {
+	}
+
+	void Enable()
+	{
+		if (!enabled)
+		{
+			pShape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, true);
+			enabled = true;
+		}
+	}
+
+	void Disable()
+	{
+		if (enabled)
+		{
+			pShape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
+			enabled = false;
+		}
 	}
 };
 
@@ -1586,6 +1619,9 @@ void KeyDown(SDL_KeyboardEvent key)
 				player->MoveDir(glm::vec2(1.00f, 0.00f));
 		}
 		break;
+	case(SDLK_SPACE):
+		groundPlane->Disable();
+		break;
 	}
 }
 
@@ -1620,6 +1656,9 @@ void KeyUp(SDL_KeyboardEvent key)
 			if (player != nullptr)
 				player->MoveDir(glm::vec2(-1.00f, 0.00f));
 		}
+		break;
+	case(SDLK_SPACE):
+		groundPlane->Enable();
 		break;
 	}
 }
