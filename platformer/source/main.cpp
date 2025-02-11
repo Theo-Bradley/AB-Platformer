@@ -233,7 +233,7 @@ void Draw()
 	outlineShader->Use();
 	outlineShader->SetUniforms(testSun->CalculateCombinedMatrix(), testSun->GetPosition());
 	obj1->Draw();
-	//groundPlane->Draw();
+	groundPlane->Draw();
 	if (player != nullptr)
 		player->Draw();
 
