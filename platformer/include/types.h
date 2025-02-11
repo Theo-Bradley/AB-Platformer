@@ -437,7 +437,7 @@ public:
 			return; //exit
 		std::fstream fileStream; //create the fstream
 		fileStream.open(path, std::ios::in | std::ios::binary); //load file to read as binary
-		data = new char[size]; //create string to hold source
+		data = new char[size + 1]; //create string to hold source
 		fileStream.read(data, size); //load file
 		data[size] = '\0'; //make sure eof is null terminated (useful for loading text files)
 		fileStream.close(); //close file
@@ -697,7 +697,7 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); //set wrapping values
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); //..
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0); //disable mipmaps
 		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, (void*)NULL); //allocate memory
 		glActiveTexture(oldTexture);
 		GLFormat = internalFormat;
@@ -716,10 +716,7 @@ public:
 			glActiveTexture(GL_TEXTURE8); //select texture unit 8 (we have this reserved for creating textures)
 			glGenTextures(1, &texture); //gen empty tex
 			glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, texture); //bind it
-			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); //set wrapping values
-			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); //..
-			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAX_LEVEL, 0);
+			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAX_LEVEL, 0); //disable mip mapping
 			glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, internalFormat, width, height, false); //allocate memory
 			glActiveTexture(oldTexture);
 			GLFormat = internalFormat;
@@ -799,7 +796,7 @@ public:
 		if (multisample)
 		{
 			glGenFramebuffers(1, &framebuffer);
-			color = new Texture(width, height, true, GL_RGB, GL_UNSIGNED_BYTE);
+			color = new Texture(width, height, true, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE);
 			depth = new Texture(width, height, true, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
 			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
 			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -811,7 +808,6 @@ public:
 				std::cout << "Framebuffer Depth Completeness: 0x" << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << "\n";
 			}
 		}
-		GLFramebuffer(width, height);
 		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
 	}
 
@@ -862,7 +858,23 @@ public:
 	{
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, multisampleBuffer->GetFramebuffer());
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
-		glBlitFramebuffer();
+		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	}
+
+	Texture* GetColorMS()
+	{
+		return multisampleBuffer->GetColor();
+	}
+
+	Texture* GetDepthMS()
+	{
+		return multisampleBuffer->GetDepth();
+	}
+
+	unsigned int GetFramebufferMS()
+	{
+		return multisampleBuffer->GetFramebuffer();
 	}
 };
 
@@ -1453,7 +1465,7 @@ class Sun: public Light
 protected:
 	float strength;
 	GLFramebuffer* shadowBuffer;
-	const int shadowMapSize = 2048;
+	const int shadowMapSize = 1024;
 
 public:
 	Sun(glm::vec3 _pos)
@@ -1487,6 +1499,7 @@ public:
 	void EndShadowPass()
 	{
 		glCullFace(GL_BACK);
+		shadowBuffer->GetDepth()->Use(2);
 		glViewport(0, 0, (int)screenWidth, (int)screenHeight);
 	}
 };
