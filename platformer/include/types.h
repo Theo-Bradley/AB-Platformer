@@ -1478,11 +1478,11 @@ protected:
 
 public:
 	Player(glm::vec3 _pos, glm::quat _rot, Model* model)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
 	{
 	}
 	Player(glm::vec3 _pos, glm::quat _rot, const char* path)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 2.00f, 1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
 	{
 	}
 
@@ -1493,12 +1493,12 @@ public:
 
 	void Update()
 	{	
-		//glm::vec4 worldV = glm::rotate(rot, 0.50f * PI, glm::vec3(0.00f, 1.00f, 0.00f)) * glm::vec4(moveDir.x * moveSpeed, 0.00f, moveDir.y * -moveSpeed, 0.0);
-		//glm::vec2 v = glm::vec2(worldV.x, worldV.z); //get target move speed
-		//glm::vec3 current = FromPxVec(pBody->getLinearVelocity());
-		//glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
-		//glm::vec2 f = pBody->getMass() * (v - u) / moveTime;
-		//pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply force
+		glm::vec4 worldV = glm::rotate(rot, mainCamera->GetAngle() + 0.50f * PI, glm::vec3(0.00f, 1.00f, 0.00f)) * glm::vec4(moveDir.x * moveSpeed, 0.00f, moveDir.y * -moveSpeed, 0.0);
+		glm::vec2 v = glm::vec2(worldV.x, worldV.z); //get target move speed
+		glm::vec3 current = FromPxVec(pBody->getLinearVelocity());
+		glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
+		glm::vec2 f = pBody->getMass() * (v - u) / moveTime;
+		pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply force
 		PhysicsObject::Update();
 	}
 };
