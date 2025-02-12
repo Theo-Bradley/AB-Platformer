@@ -1,3 +1,6 @@
+#ifndef _myDefines
+#define _myDefines
+
 #ifdef _WIN32
 #define exit(code) exit(##code##)
 #endif
@@ -10,8 +13,6 @@
 #define key_Left SDLK_A
 #define key_Backward SDLK_S
 #define key_Right SDLK_D
-
-using namespace physx;
 
 const char* errorVert = { "#version 450 core\n"
 "layout(location = 0) in vec3 position;\n"
@@ -28,3 +29,15 @@ const char* errorFrag = { "#version 450 core\n"
 "	color = vec4(1.0, 0.0, 1.0, 1.0);\n"
 "}\n"
 };
+
+float screenWidth, screenHeight;
+float sensitivity = 0.66f;
+
+class Shader;
+Shader* errorShader = nullptr;
+
+class Camera;
+Camera* mainCamera;
+#endif
+
+using namespace physx;

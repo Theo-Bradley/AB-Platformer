@@ -32,5 +32,8 @@
     <ClInclude Include="include\defines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\base_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

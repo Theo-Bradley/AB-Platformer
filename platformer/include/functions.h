@@ -1,5 +1,11 @@
 #include "defines.h"
 
+int quit(int code);
+void KeyDown(SDL_KeyboardEvent key);
+void KeyUp(SDL_KeyboardEvent key);
+void MouseMoved();
+void MouseWheel(SDL_MouseWheelEvent e);
+
 void PrintGLErrors()
 {
 	GLenum err;
@@ -8,8 +14,6 @@ void PrintGLErrors()
 		std::cout << "OpenGL Error: " << std::hex << "0x" << err << std::dec << "\n";
 	}
 }
-
-int quit(int code);
 
 class PhysicsErrorCallback : public PxErrorCallback
 {

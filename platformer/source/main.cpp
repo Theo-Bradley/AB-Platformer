@@ -19,10 +19,6 @@ int main(int argc, char** argv)
 	testShader = new Shader(Path("basic.vert"), Path("basic.frag"));
 	testShader->SetUniforms();
 
-	/*PxMaterial* planeMat = pPhysics->createMaterial(0.50f, 0.40f, 0.90f);
-	PxRigidStatic* plane = PxCreatePlane(*pPhysics, PxPlane(PxVec3(0.00f, -1.00f, 0.00f), PxVec3(0.00f, 1.00f, 0.00f)), *planeMat);
-	pScene->addActor(*plane);*/
-
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	obj1 = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, copyModel);
 	groundPlane = new Platform(glm::vec3(0.0f, -1.00f, 0.00f), glm::vec3(6.60f, 1.00f, 5.50f), copyModel);
