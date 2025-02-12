@@ -4,65 +4,6 @@ int init();
 void HandleEvents();
 void Draw();
 
-float plane[] = {
-	-0.5f, -0.5f, 0.0f,
-	0.0f, 0.0f,
-	0.5f, -0.5f, 0.0f,
-	1.0f, 0.0f,
-	0.5f, 0.5f, 0.0f,
-	1.0f, 1.0f,
-	-0.5f, 0.5f, 0.0f,
-	0.0f, 1.0f };
-
-unsigned int planeIndices[6] = {
-	0, 1, 2,
-	2, 3, 0
-};
-
-float cube[] = {
-	-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-	 0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-
-	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-	 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-	-0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-
-	-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	-0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-	-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	 0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	 0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-	 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-	 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-
-	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	-0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-};
-
 Shader* testShader;
 Shader* outlineShader;
 File* testFile;
@@ -75,14 +16,14 @@ int main(int argc, char** argv)
 	bool running = true;
 	init();
 
-	testShader = new Shader(Path("basic.vert").c_str(), Path("basic.frag").c_str());
+	testShader = new Shader(Path("basic.vert"), Path("basic.frag"));
 	testShader->SetUniforms();
 
 	/*PxMaterial* planeMat = pPhysics->createMaterial(0.50f, 0.40f, 0.90f);
 	PxRigidStatic* plane = PxCreatePlane(*pPhysics, PxPlane(PxVec3(0.00f, -1.00f, 0.00f), PxVec3(0.00f, 1.00f, 0.00f)), *planeMat);
 	pScene->addActor(*plane);*/
 
-	Model* copyModel = new Model(Path("models/cube.obj").c_str(), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
+	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	obj1 = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, copyModel);
 	groundPlane = new Platform(glm::vec3(0.0f, -1.00f, 0.00f), glm::vec3(6.60f, 1.00f, 5.50f), copyModel);
 	delete copyModel;
@@ -177,37 +118,20 @@ int init()
 	glEnable(GL_CULL_FACE);
 	errorShader = new Shader(true);
 	errorShader->Use();
-	shadowShader = new Shader(Path("shadow.vert").c_str(), Path("basic.frag").c_str());
-	outlineShader = new Shader(Path("outline.vert").c_str(), Path("outline.frag").c_str());
+	shadowShader = new Shader(Path("shadow.vert"), Path("basic.frag"));
+	outlineShader = new Shader(Path("outline.vert"), Path("outline.frag"));
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
 	depthBuffer->GetDepth()->Use(3);
 
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
-	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), Path("models/cube.obj").c_str());
+	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), Path("models/cube.obj"));
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	SDL_GL_SwapWindow(window);
 	return 0;
-}
-
-int quit(int code)
-{
-	SDL_Quit();
-	if (pScene != nullptr)
-		PX_RELEASE(pScene);
-	if (pDispatcher != nullptr)
-		PX_RELEASE(pDispatcher);
-	if (pPhysics != nullptr)
-		PX_RELEASE(pPhysics);
-	if (pPvd != nullptr)
-		PX_RELEASE(pPvd);
-	if (pFoundation != nullptr)
-		PX_RELEASE(pFoundation);
-
-	exit(code);
 }
 
 void Draw()

@@ -17,35 +17,7 @@
 #include "assimp/Importer.hpp"
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
-
-using namespace physx;
-
-#ifdef _WIN32
-#define exit(code) exit(##code##)
-#endif
-
-#define PI glm::pi<float>()
-
-#define Path(asset) std::string(SDL_GetBasePath() + std::string("assets\\") +std::string(##asset##))
-
-const char* errorVert = { "#version 450 core\n"
-"layout(location = 0) in vec3 position;\n"
-"void main()\n"
-"{\n"
-"	gl_Position = vec4(position.x, position.y, 0.0, 1.0);\n"
-"}\n"
-};
-
-const char* errorFrag = { "#version 450 core\n"
-"out vec4 color;\n"
-"void main()\n"
-"{\n"
-"	color = vec4(1.0, 0.0, 1.0, 1.0);\n"
-"}\n"
-};
-
-int quit(int code);
-void PrintGLErrors();
+#include "functions.h"
 
 class Shader;
 class Camera;
@@ -53,29 +25,26 @@ class GLFramebuffer;
 class Player;
 class Platform;
 
-class PhysicsErrorCallback : public PxErrorCallback
-{
-public:
-	virtual void reportError(PxErrorCode::Enum code, const char* message, const char* file, int line)
-	{
-		// error processing implementation
-		std::cout << std::dec << "PhysX Error: " << code << ": " << message << " in " << file << " at " << line << "\nPress Enter to exit!";
-		std::getchar();
-		switch (code)
-		{
-		case PxErrorCode::eABORT:
-			exit(-1);
-		case PxErrorCode::eINTERNAL_ERROR:
-			exit(-1);
-		case PxErrorCode::eOUT_OF_MEMORY:
-			exit(-1);
-		case PxErrorCode::eINVALID_OPERATION:
-			exit(-2);
-		case PxErrorCode::eINVALID_PARAMETER:
-			exit(-2);
-		}
-	}
-};
+SDL_Window* window;
+SDL_GLContext glContext;
+Shader* errorShader = nullptr;
+Camera* mainCamera;
+PxDefaultAllocator pAlloc;
+PhysicsErrorCallback pError;
+PxFoundation* pFoundation;
+PxPhysics* pPhysics;
+PxDefaultCpuDispatcher* pDispatcher;
+PxScene* pScene;
+PxMaterial* pMaterial;
+PxPvd* pPvd;
+GLFramebuffer* depthBuffer;
+unsigned long long int eTime = 0;
+unsigned long long dTime = 1;
+float screenWidth, screenHeight;
+float sensitivity = 0.66f;
+Player* player;
+Shader* shadowShader;
+Platform* groundPlane;
 
 class Key
 {
@@ -116,32 +85,6 @@ public:
 	}
 };
 
-#define key_Forward SDLK_W
-#define key_Left SDLK_A
-#define key_Backward SDLK_S
-#define key_Right SDLK_D
-
-SDL_Window* window;
-SDL_GLContext glContext;
-Shader* errorShader = nullptr;
-Camera* mainCamera;
-PxDefaultAllocator pAlloc;
-PhysicsErrorCallback pError;
-PxFoundation* pFoundation;
-PxPhysics* pPhysics;
-PxDefaultCpuDispatcher* pDispatcher;
-PxScene* pScene;
-PxMaterial* pMaterial;
-PxPvd* pPvd;
-GLFramebuffer* depthBuffer;
-unsigned long long int eTime = 0;
-unsigned long long dTime = 1;
-float screenWidth, screenHeight;
-float sensitivity = 0.66f;
-Player* player;
-Shader* shadowShader;
-Platform* groundPlane;
-
 Key k_Forward = Key(key_Forward);
 Key k_Left = Key(key_Left);
 Key k_Backward = Key(key_Backward);
@@ -156,87 +99,12 @@ struct Vertex
 	glm::vec2 uv;
 };
 
-glm::vec3 FromAssimpVec(aiVector3D _vec)
+struct MaterialProperties
 {
-	return glm::vec3(_vec.x, _vec.y, _vec.z);
-}
-
-glm::vec2 FromAssimpVec(aiVector2D _vec)
-{
-	return glm::vec2(_vec.x, _vec.y);
-}
-
-glm::vec3 FromPxVec(PxVec3 from)
-{
-	return glm::vec3(from.x, from.y, from.z);
-}
-
-PxVec3 FromGLMVec(glm::vec3 from)
-{
-	return PxVec3(from.x, from.y, from.z);
-}
-
-glm::quat FromPxQuat(PxQuat from)
-{
-	return glm::quat(from.w, from.x, from.y, from.z);
-}
-
-PxQuat FromGLMQuat(glm::quat from)
-{
-	return PxQuat(from.x, from.y, from.z, from.w);
-}
-
-glm::quat FromAssimpQuat(aiQuaternion from)
-{
-	return glm::quat(from.w, from.x, from.y, from.z);
-}
-
-//effectively transposes the aiMatrix4x4 into a glm::mat4
-glm::mat4 FromAssimpMat(aiMatrix4x4 _mat)
-{
-	glm::mat4 result = glm::mat4(0.0f);
-	result[0][0] = _mat[0][0]; //result[c][r] = _mat[r][c]
-	result[0][1] = _mat[1][0];
-	result[0][2] = _mat[2][0];
-	result[0][3] = _mat[3][0];
-	result[1][0] = _mat[0][1];
-	result[1][1] = _mat[1][1];
-	result[1][2] = _mat[2][1];
-	result[1][3] = _mat[3][1];
-	result[2][0] = _mat[0][2];
-	result[2][1] = _mat[1][2];
-	result[2][2] = _mat[2][2];
-	result[2][3] = _mat[3][2];
-	result[3][0] = _mat[0][3];
-	result[3][1] = _mat[1][3];
-	result[3][2] = _mat[2][3];
-	result[3][3] = _mat[3][3];
-	return result;
-}
-
-//effectively transposes the glm::mat4 into an aiMatrix4x4
-aiMatrix4x4 FromGLMMat(glm::mat4 _mat)
-{
-	aiMatrix4x4 result = aiMatrix4x4();
-	result[0][0] = _mat[0][0]; //result[c][r] = _mat[r][c]
-	result[0][1] = _mat[1][0];
-	result[0][2] = _mat[2][0];
-	result[0][3] = _mat[3][0];
-	result[1][0] = _mat[0][1];
-	result[1][1] = _mat[1][1];
-	result[1][2] = _mat[2][1];
-	result[1][3] = _mat[3][1];
-	result[2][0] = _mat[0][2];
-	result[2][1] = _mat[1][2];
-	result[2][2] = _mat[2][2];
-	result[2][3] = _mat[3][2];
-	result[3][0] = _mat[0][3];
-	result[3][1] = _mat[1][3];
-	result[3][2] = _mat[2][3];
-	result[3][3] = _mat[3][3];
-	return result;
-}
-
+	float staticFriction;
+	float dynamicFriction;
+	float restitution;
+};
 
 class Object
 {
@@ -761,7 +629,7 @@ public:
 		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
 	}
 
-	GLFramebuffer(int _width, int _height)
+	/*GLFramebuffer(int _width, int _height)
 	{
 		width = _width;
 		height = _height;
@@ -779,13 +647,15 @@ public:
 			std::cout << "Framebuffer Depth Completeness: 0x" << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << "\n";
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
-	}
+	}*/
 
-	GLFramebuffer(int width, int height, bool multisample)
+	GLFramebuffer(int _width, int _height, bool multisample = false)
 	{
 		unsigned int oldFramebuffer = 0;
 		if (multisample)
 		{
+			width = _width;
+			height = _height;
 			glGenFramebuffers(1, &framebuffer);
 			color = new Texture(width, height, true, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE);
 			depth = new Texture(width, height, true, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
@@ -798,6 +668,19 @@ public:
 			{
 				std::cout << "Framebuffer Depth Completeness: 0x" << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << "\n";
 			}
+		}
+		else
+		{
+			width = _width;
+			height = _height;
+			glGenFramebuffers(1, &framebuffer);
+			color = new Texture(width, height, GL_RGB, GL_UNSIGNED_BYTE);
+			depth = new Texture(width, height, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
+			unsigned int oldFramebuffer = 0;
+			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
+			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color->GetTexture(), 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth->GetTexture(), 0);
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
 	}
@@ -1344,13 +1227,6 @@ public:
 	}
 };
 
-struct MaterialProperties
-{
-	float staticFriction;
-	float dynamicFriction;
-	float restitution;
-};
-
 class PhysicsObject: public Model
 {
 protected:
@@ -1683,11 +1559,19 @@ void MouseWheel(SDL_MouseWheelEvent e)
 	}
 }
 
-void PrintGLErrors()
+int quit(int code)
 {
-	GLenum err;
-	while ((err = glGetError()) != GL_NO_ERROR)
-	{
-		std::cout << "OpenGL Error: " << std::hex << "0x" << err << std::dec << "\n";
-	}
+	SDL_Quit();
+	if (pScene != nullptr)
+		PX_RELEASE(pScene);
+	if (pDispatcher != nullptr)
+		PX_RELEASE(pDispatcher);
+	if (pPhysics != nullptr)
+		PX_RELEASE(pPhysics);
+	if (pPvd != nullptr)
+		PX_RELEASE(pPvd);
+	if (pFoundation != nullptr)
+		PX_RELEASE(pFoundation);
+
+	exit(code);
 }

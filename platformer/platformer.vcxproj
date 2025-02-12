@@ -176,6 +176,8 @@ del "$(OutDir)*_64_d.dll"</Command>
     <ClCompile Include="source\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\defines.h" />
+    <ClInclude Include="include\functions.h" />
     <ClInclude Include="include\PhysX\PxPhysicsAPI.h" />
     <ClInclude Include="include\types.h" />
   </ItemGroup>
