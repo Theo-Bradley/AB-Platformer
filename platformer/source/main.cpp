@@ -9,6 +9,8 @@ Shader* outlineShader;
 File* testFile;
 Model* testModel;
 PhysicsObject* obj1;
+Platform* platformA;
+Platform* platformB;
 Sun* testSun;
 
 int main(int argc, char** argv)
@@ -21,7 +23,12 @@ int main(int argc, char** argv)
 
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	obj1 = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, copyModel);
-	groundPlane = new Platform(glm::vec3(0.0f, -1.00f, 0.00f), glm::vec3(6.60f, 1.00f, 5.50f), copyModel);
+	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(6.60f, 1.00f, 5.50f), copyModel);
+	platformA = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
+	platformB = new Platform(glm::vec3(-1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
+	platformB->Disable();
+	APlatforms.push_back(platformA);
+	BPlatforms.push_back(platformB);
 	delete copyModel;
 
 	testSun = new Sun(glm::vec3(-1.00f, 5.00f, -1.00f));
@@ -138,6 +145,8 @@ void Draw()
 	testShader->SetUniforms();
 	obj1->Draw();
 	player->Draw();
+	platformA->Draw();
+	platformB->Draw();
 	groundPlane->Draw();
 
 	glEnable(GL_MULTISAMPLE);
@@ -145,6 +154,8 @@ void Draw()
 	obj1->Draw();
 	player->Draw();
 	groundPlane->Draw();
+	platformA->Draw();
+	platformB->Draw();
 	testSun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -155,6 +166,8 @@ void Draw()
 	groundPlane->Draw();
 	if (player != nullptr)
 		player->Draw();
+	platformA->Draw();
+	platformB->Draw();
 
 	PrintGLErrors();
 

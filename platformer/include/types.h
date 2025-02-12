@@ -86,6 +86,7 @@ Key k_Forward = Key(key_Forward);
 Key k_Left = Key(key_Left);
 Key k_Backward = Key(key_Backward);
 Key k_Right = Key(key_Right);
+Key k_Toggle = Key(key_PlatformToggle);
 
 class GLFramebufferMS : public GLFramebuffer
 {
@@ -638,7 +639,7 @@ class Platform
 	: public StaticObject
 {
 protected:
-	bool enabled;
+	bool enabled = true;
 
 public:
 	Platform(glm::vec3 _pos, glm::vec3 _scale, Model* copyModel)
@@ -746,8 +747,11 @@ void KeyDown(SDL_KeyboardEvent key)
 				player->MoveDir(glm::vec2(1.00f, 0.00f));
 		}
 		break;
-	case(SDLK_SPACE):
-		groundPlane->Disable();
+	case(key_PlatformToggle):
+		if (k_Toggle.Press())
+		{
+			TogglePlatforms();
+		}
 		break;
 	}
 }
@@ -784,8 +788,8 @@ void KeyUp(SDL_KeyboardEvent key)
 				player->MoveDir(glm::vec2(-1.00f, 0.00f));
 		}
 		break;
-	case(SDLK_SPACE):
-		groundPlane->Enable();
+	case(key_PlatformToggle):
+		k_Toggle.Release();
 		break;
 	}
 }
@@ -825,4 +829,20 @@ int quit(int code)
 		PX_RELEASE(pFoundation);
 
 	exit(code);
+}
+
+void TogglePlatforms()
+{
+	if (platformToggle)
+	{
+		std::for_each(APlatforms.begin(), APlatforms.end(), [&](Platform* platform) { platform->Enable(); });
+		std::for_each(BPlatforms.begin(), BPlatforms.end(), [&](Platform* platform) { platform->Disable(); });
+		platformToggle = false;
+	}
+	else
+	{
+		std::for_each(APlatforms.begin(), APlatforms.end(), [&](Platform* platform) { platform->Disable(); });
+		std::for_each(BPlatforms.begin(), BPlatforms.end(), [&](Platform* platform) { platform->Enable(); });
+		platformToggle = true;
+	}
 }

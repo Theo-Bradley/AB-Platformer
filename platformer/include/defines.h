@@ -13,6 +13,7 @@
 #define key_Left SDLK_A
 #define key_Backward SDLK_S
 #define key_Right SDLK_D
+#define key_PlatformToggle SDLK_SPACE
 
 const char* errorVert = { "#version 450 core\n"
 "layout(location = 0) in vec3 position;\n"
@@ -38,6 +39,11 @@ Shader* errorShader = nullptr;
 
 class Camera;
 Camera* mainCamera;
+
+class Platform;
+std::vector<Platform*> APlatforms;
+std::vector<Platform*> BPlatforms;
+bool platformToggle = false;
 #endif
 
 using namespace physx;

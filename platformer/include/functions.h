@@ -119,3 +119,5 @@ aiMatrix4x4 FromGLMMat(glm::mat4 _mat)
 	result[3][3] = _mat[3][3];
 	return result;
 }
+
+void TogglePlatforms();

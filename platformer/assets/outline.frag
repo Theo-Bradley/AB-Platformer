@@ -27,19 +27,19 @@ float linearize_depth(float d)
 
 float SunShadow()
 { //adapted from https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping
-	float bias = max(0.0005 * (1.0 - dot(normal, normalize(position - sunPos))), 0.00005); //depth bias to avoid shadow acne
+	float bias = max(0.005 * (1.0 - dot(normal, normalize(position - sunPos))), 0.0005); //depth bias to avoid shadow acne
 	vec3 coord = sunFragPos.xyz / sunFragPos.w;
 	coord = coord * 0.5 + 0.5; //convert NDC to tex coords
 	float result = 0.0;
 	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
     float pcfDepth = texture(shadowMap, coord.xy + vec2(-1, -1) * texelSize).x; //sample around the actual texel
-    result += coord.z + bias > pcfDepth ? 1.0 : 0.0; //if the current depth is closer than closest depth then its not in shadow
+    result += coord.z - bias > pcfDepth ? 1.0 : 0.0; //if the current depth is closer than closest depth then its not in shadow
 	pcfDepth = texture(shadowMap, coord.xy + vec2(-1, 1) * texelSize).x;
-    result += coord.z + bias > pcfDepth ? 1.0 : 0.0;
+    result += coord.z - bias > pcfDepth ? 1.0 : 0.0;
 	pcfDepth = texture(shadowMap, coord.xy + vec2(1, 1) * texelSize).x;
-    result += coord.z + bias > pcfDepth ? 1.0 : 0.0;
+    result += coord.z - bias > pcfDepth ? 1.0 : 0.0;
 	pcfDepth = texture(shadowMap, coord.xy + vec2(1, -1) * texelSize).x;
-    result += coord.z + bias > pcfDepth ? 1.0 : 0.0;
+    result += coord.z - bias > pcfDepth ? 1.0 : 0.0;
 	result /= 9.0; //convolution kernel magic
 	return clamp(1.0 - result, 0.0, 1.0);
 }

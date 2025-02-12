@@ -3,4 +3,5 @@ replace current SunShadow func with shader from https://github.com/Theo-Bradley/
 Maybe anti alias the shadow map????? - didnt work, cant MS a depth attachment
 	-maybe draw to color and AA that??
 maybe draw first then do shadow pass after (no self shadowing)? use dir light for sun
+	-then if normal is facing away from the light, it's in shadow
 AI_SCENE_FLAGS_NON_VERBOSE_FORMAT
