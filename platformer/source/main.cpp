@@ -11,7 +11,7 @@ Model* testModel;
 PhysicsObject* obj1;
 Platform* platformA;
 Platform* platformB;
-Sun* testSun;
+Sun* sun;
 
 int main(int argc, char** argv)
 {
@@ -31,7 +31,7 @@ int main(int argc, char** argv)
 	BPlatforms.push_back(platformB);
 	delete copyModel;
 
-	testSun = new Sun(glm::vec3(-1.00f, 5.00f, -1.00f));
+	sun = new Sun(glm::vec3(-5.00f, 4.00f, -1.00f));
 	
 	eTime = SDL_GetTicks();
 
@@ -150,18 +150,18 @@ void Draw()
 	groundPlane->Draw();
 
 	glEnable(GL_MULTISAMPLE);
-	testSun->StartShadowPass(shadowShader);
+	sun->StartShadowPass(shadowShader);
 	obj1->Draw();
 	player->Draw();
 	groundPlane->Draw();
 	platformA->Draw();
 	platformB->Draw();
-	testSun->EndShadowPass();
+	sun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	outlineShader->Use();
-	outlineShader->SetUniforms(testSun->CalculateCombinedMatrix(), testSun->GetPosition());
+	outlineShader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	obj1->Draw();
 	groundPlane->Draw();
 	if (player != nullptr)
