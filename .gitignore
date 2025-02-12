@@ -5,7 +5,6 @@
 *.slo
 *.lo
 *.o
-*.obj
 
 # Precompiled Headers
 *.gch
@@ -23,6 +22,7 @@
 #pointless build log files
 platformer/x64/*
 platformer/x32/*
+platformer/platformer/*
 
 #vs folder
 platformer/.vs/*
