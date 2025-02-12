@@ -27,21 +27,28 @@ float linearize_depth(float d)
 
 float SunShadow()
 { //adapted from https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping
-	float bias = max(0.005 * (1.0 - dot(normal, normalize(position - sunPos))), 0.0005); //depth bias to avoid shadow acne
 	vec3 coord = sunFragPos.xyz / sunFragPos.w;
 	coord = coord * 0.5 + 0.5; //convert NDC to tex coords
 	float result = 0.0;
 	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
     float pcfDepth = texture(shadowMap, coord.xy + vec2(-1, -1) * texelSize).x; //sample around the actual texel
-    result += coord.z - bias > pcfDepth ? 1.0 : 0.0; //if the current depth is closer than closest depth then its not in shadow
+    result += coord.z > pcfDepth ? 1.0 : 0.0; //if the current depth is closer than closest depth then its not in shadow
 	pcfDepth = texture(shadowMap, coord.xy + vec2(-1, 1) * texelSize).x;
-    result += coord.z - bias > pcfDepth ? 1.0 : 0.0;
+    result += coord.z > pcfDepth ? 1.0 : 0.0;
 	pcfDepth = texture(shadowMap, coord.xy + vec2(1, 1) * texelSize).x;
-    result += coord.z - bias > pcfDepth ? 1.0 : 0.0;
+    result += coord.z > pcfDepth ? 1.0 : 0.0;
 	pcfDepth = texture(shadowMap, coord.xy + vec2(1, -1) * texelSize).x;
-    result += coord.z - bias > pcfDepth ? 1.0 : 0.0;
+    result += coord.z > pcfDepth ? 1.0 : 0.0;
 	result /= 9.0; //convolution kernel magic
 	return clamp(1.0 - result, 0.0, 1.0);
+}
+
+vec3 SunDiffuse()
+{
+	vec3 sunColor = vec3(1.0, 1.0, 1.0);
+	vec3 sunDir = normalize(sunPos);
+	float value = max(dot(normal, sunDir), 0.0);
+	return value * sunColor;
 }
 
 void main()
@@ -60,7 +67,8 @@ void main()
 	float depthDiff = length(vec2(dBL - dTR, dBR - dTL)); //get overall difference between points
 	depthDiff = depthDiff > depthThresh ? 1.0 : 0.0;
 	vec3 albedo = fma(outlineColor, vec3(depthDiff), baseColor * (1.0 - depthDiff));
-	vec3 shadowLight = vec3(SunShadow());
+	vec3 shadowLight = vec3(SunShadow()) * SunDiffuse(); //we multiply them because they are the same light
+	//SunShadow() gets the shadow from the shadow map, and SunDiffuse() calculates our shadow using sunPos
 	vec3 globalLight = baseColor * 0.1;
 	color = vec4(albedo * (shadowLight + globalLight), 1.0);
 }

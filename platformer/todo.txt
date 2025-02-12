@@ -1,7 +1,4 @@
 change outline shader screenSize to be a call to textureSize
 replace current SunShadow func with shader from https://github.com/Theo-Bradley/Supermaket-Scramble/blob/master/proj/game/Assets/Shaders/s_FragmentToon.frag
-Maybe anti alias the shadow map????? - didnt work, cant MS a depth attachment
-	-maybe draw to color and AA that??
-maybe draw first then do shadow pass after (no self shadowing)? use dir light for sun
-	-then if normal is facing away from the light, it's in shadow
+Fix peter panning
 AI_SCENE_FLAGS_NON_VERBOSE_FORMAT

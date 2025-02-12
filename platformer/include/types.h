@@ -43,45 +43,6 @@ Player* player;
 Shader* shadowShader;
 Platform* groundPlane;
 
-class Key
-{
-protected:
-	SDL_Keycode keycode;
-	bool pressed = false;
-
-public:
-	Key(SDL_Keycode _keycode)
-	{
-		keycode = _keycode;
-		pressed = false;
-	}
-
-	SDL_Keycode GetCode()
-	{
-		return keycode;
-	}
-
-	bool Press()
-	{
-		if (!pressed)
-		{
-			pressed = true;
-			return true;
-		}
-		return false;
-	}
-
-	bool Release()
-	{
-		if (pressed)
-		{
-			pressed = false;
-			return true;
-		}
-		return false;
-	}
-};
-
 Key k_Forward = Key(key_Forward);
 Key k_Left = Key(key_Left);
 Key k_Backward = Key(key_Backward);
@@ -697,6 +658,8 @@ public:
 	void StartShadowPass(Shader* shader)
 	{
 		glCullFace(GL_FRONT);
+		//glEnable(GL_POLYGON_OFFSET_FILL); //should fix the shadow aliasing //re-enable if shadow aliasing appears again
+		//glPolygonOffset(1.f, 1);
 		shader->Use();
 		shader->SetUniforms(CalculateCombinedMatrix(), pos);
 		glViewport(0, 0, shadowMapSize, shadowMapSize);
@@ -707,6 +670,7 @@ public:
 	void EndShadowPass()
 	{
 		glCullFace(GL_BACK);
+		//glDisable(GL_POLYGON_OFFSET_FILL);
 		shadowBuffer->GetDepth()->Use(2);
 		glViewport(0, 0, (int)screenWidth, (int)screenHeight);
 	}

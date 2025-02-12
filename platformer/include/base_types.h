@@ -705,6 +705,8 @@ public:
 	{
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0); //index, count, type, normalize?, stride, offset
 		glEnableVertexAttribArray(0); //enable attribute
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Vertex::normal));
+		glEnableVertexAttribArray(1);
 	}
 
 	void Draw()
@@ -715,5 +717,44 @@ public:
 		else //if not using vertex indices
 			glDrawArrays(GL_TRIANGLES, 0, triCount); //regular draw
 		glBindVertexArray(0);
+	}
+};
+
+class Key
+{
+protected:
+	SDL_Keycode keycode;
+	bool pressed = false;
+
+public:
+	Key(SDL_Keycode _keycode)
+	{
+		keycode = _keycode;
+		pressed = false;
+	}
+
+	SDL_Keycode GetCode()
+	{
+		return keycode;
+	}
+
+	bool Press()
+	{
+		if (!pressed)
+		{
+			pressed = true;
+			return true;
+		}
+		return false;
+	}
+
+	bool Release()
+	{
+		if (pressed)
+		{
+			pressed = false;
+			return true;
+		}
+		return false;
 	}
 };

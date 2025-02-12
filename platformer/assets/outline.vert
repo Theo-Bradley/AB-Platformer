@@ -15,6 +15,6 @@ void main()
 {
 	gl_Position = matrix * model * vec4(pos.xyz, 1.0);
 	position = gl_Position.xyz;
-	normal = (model * vec4(norm, 1.0)).xyz;
+	normal = (model * vec4(norm, 0.0)).xyz;
 	sunFragPos = sunMatrix * model * vec4(pos.xyz, 1.0);
 }
