@@ -101,21 +101,26 @@ protected:
 	float distance;
 	glm::mat4 view;
 	glm::mat4 projection;
+	glm::vec3 forward;
 
 	glm::mat4 LookAt(glm::vec3 target)
 	{
 		//sin(theta) z coord
 		//cos(theta) x coord
-		glm::vec3 cameraPos = glm::vec3(distance * glm::cos(angle), distance * glm::sin(inclination), distance * -glm::sin(angle));
-		return glm::lookAt(target + cameraPos, target, glm::vec3(0.00f, 1.00f, 0.00f));
+		glm::vec3 cameraPos = glm::vec3(distance * glm::sin(angle), distance * glm::sin(inclination), distance * glm::cos(angle));
+		glm::mat4 matrix = glm::lookAt(target + cameraPos, target, glm::vec3(0.00f, 1.00f, 0.00f));
+		forward = matrix * glm::vec4(0.00f, 0.00f, 1.00f, 0.00f);
+		return matrix;
 	}
 
 	glm::mat4 LookAt(Object target)
 	{
 		//sin(theta) z coord
 		//cos(theta) x coord
-		glm::vec3 cameraPos = glm::vec3(distance * glm::cos(angle), distance * glm::sin(inclination), distance * -glm::sin(angle));
-		return glm::lookAt(target.GetPosition() + cameraPos, target.GetPosition(), glm::vec3(0.00f, 1.00f, 0.00f));
+		glm::vec3 cameraPos = glm::vec3(distance * glm::sin(angle), distance * glm::sin(inclination), distance * glm::cos(angle));
+		glm::mat4 matrix = glm::lookAt(target.GetPosition() + cameraPos, target.GetPosition(), glm::vec3(0.00f, 1.00f, 0.00f));
+		forward = matrix * glm::vec4(0.00f, 0.00f, 1.00f, 0.00f);
+		return matrix;
 	}
 
 	glm::mat4 Project()
@@ -181,6 +186,11 @@ public:
 	float GetInclination()
 	{
 		return inclination;
+	}
+
+	glm::vec3 GetForward()
+	{
+		return forward;
 	}
 
 	void Distance(float amt)
@@ -324,9 +334,10 @@ public:
 		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&oldProgram)); //get the active program
 		glUseProgram(program); //use our prog
 		glUniformMatrix4fv(glGetUniformLocation(program, "matrix"), 1, false, glm::value_ptr(mainCamera->GetCombinedMatrix())); //set the uniforms
-		glUniform2f(glGetUniformLocation(program, "screenSize"), glm::floor(screenWidth), glm::floor(screenHeight));
+		glUniform3f(glGetUniformLocation(program, "camDir"), mainCamera->GetForward().x, -mainCamera->GetForward().y, mainCamera->GetForward().z);
 		glUniform1i(glGetUniformLocation(program, "shadowMap"), 2);
-		glUniform1i(glGetUniformLocation(program, "depthMap"), 3);
+		glUniform1i(glGetUniformLocation(program, "normalMap"), 3);
+		glUniform1i(glGetUniformLocation(program, "depthMap"), 4);
 		glUseProgram(oldProgram); //activate the previously active prog
 	}
 
@@ -336,9 +347,10 @@ public:
 		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&oldProgram)); //get the active program
 		glUseProgram(program); //use our prog
 		glUniformMatrix4fv(glGetUniformLocation(program, "matrix"), 1, false, glm::value_ptr(mainCamera->GetCombinedMatrix())); //set the uniforms
-		glUniform2f(glGetUniformLocation(program, "screenSize"), glm::floor(screenWidth), glm::floor(screenHeight));
+		glUniform3f(glGetUniformLocation(program, "camDir"), mainCamera->GetForward().x, -mainCamera->GetForward().y, mainCamera->GetForward().z);
 		glUniform1i(glGetUniformLocation(program, "shadowMap"), 2);
-		glUniform1i(glGetUniformLocation(program, "depthMap"), 3);
+		glUniform1i(glGetUniformLocation(program, "normalMap"), 3);
+		glUniform1i(glGetUniformLocation(program, "depthMap"), 4);
 		glUniformMatrix4fv(glGetUniformLocation(program, "sunMatrix"), 1, false, glm::value_ptr(sunMatrix)); //set the uniforms
 		glUniform3f(glGetUniformLocation(program, "sunPos"), sunPos.x, sunPos.y, sunPos.z);
 

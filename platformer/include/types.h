@@ -659,7 +659,7 @@ public:
 	{
 		glCullFace(GL_FRONT);
 		//glEnable(GL_POLYGON_OFFSET_FILL); //should fix the shadow aliasing //re-enable if shadow aliasing appears again
-		//glPolygonOffset(1.f, 1);
+		//glPolygonOffset(1.f, 1); //other stuff https://learn.microsoft.com/en-gb/windows/win32/dxtecharts/common-techniques-to-improve-shadow-depth-maps
 		shader->Use();
 		shader->SetUniforms(CalculateCombinedMatrix(), pos);
 		glViewport(0, 0, shadowMapSize, shadowMapSize);

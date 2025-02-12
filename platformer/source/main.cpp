@@ -4,7 +4,7 @@ int init();
 void HandleEvents();
 void Draw();
 
-Shader* testShader;
+Shader* outlineBufferShader;
 Shader* outlineShader;
 File* testFile;
 Model* testModel;
@@ -18,8 +18,8 @@ int main(int argc, char** argv)
 	bool running = true;
 	init();
 
-	testShader = new Shader(Path("basic.vert"), Path("basic.frag"));
-	testShader->SetUniforms();
+	outlineBufferShader = new Shader(Path("outline_buffer.vert"), Path("outline_buffer.frag"));
+	outlineBufferShader->SetUniforms();
 
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	obj1 = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, copyModel);
@@ -125,7 +125,8 @@ int init()
 	outlineShader = new Shader(Path("outline.vert"), Path("outline.frag"));
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
-	depthBuffer->GetDepth()->Use(3);
+	depthBuffer->GetColor()->Use(3);
+	depthBuffer->GetDepth()->Use(4);
 
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
@@ -141,8 +142,8 @@ void Draw()
 {
 	depthBuffer->Use();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
-	testShader->Use();
-	testShader->SetUniforms();
+	outlineBufferShader->Use();
+	outlineBufferShader->SetUniforms();
 	obj1->Draw();
 	player->Draw();
 	platformA->Draw();
