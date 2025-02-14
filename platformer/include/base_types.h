@@ -552,8 +552,8 @@ public:
 			width = _width;
 			height = _height;
 			glGenFramebuffers(1, &framebuffer);
-			color = new Texture(width, height, true, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE);
-			depth = new Texture(width, height, true, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
+			color = new Texture(width, height, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE, true);
+			depth = new Texture(width, height, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, true);
 			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
 			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, color->GetTexture(), 0);

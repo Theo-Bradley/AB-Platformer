@@ -8,6 +8,8 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/vector_angle.hpp>
 #include "PhysX/PxPhysicsAPI.h"
 #define STB_IMAGE_IMPLEMENTATION
 #ifdef WINDOWS
@@ -455,6 +457,7 @@ protected:
 		pBody = pPhysics->createRigidDynamic(transform); //create the dynamic rigidbody
 		pBody->attachShape(*pShape); //attatch the shape to it
 		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
+		pBody->setAngularDamping(0.10f);
 		pScene->addActor(*pBody); //add rigid body to scene
 		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
 	}
@@ -571,11 +574,11 @@ protected:
 
 public:
 	Player(glm::vec3 _pos, glm::quat _rot, Model* model)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.25f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
 	{
 	}
 	Player(glm::vec3 _pos, glm::quat _rot, const char* path)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.25f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
 	{
 	}
 
@@ -584,15 +587,36 @@ public:
 		moveDir += dir;
 	}
 
-	void Update()
-	{	
-		glm::vec4 worldV = glm::rotate(rot, mainCamera->GetAngle() + 0.50f * PI, glm::vec3(0.00f, 1.00f, 0.00f)) * glm::vec4(moveDir.x * moveSpeed, 0.00f, moveDir.y * -moveSpeed, 0.0);
-		glm::vec2 v = glm::vec2(worldV.x, worldV.z); //get target move speed
-		glm::vec3 current = FromPxVec(pBody->getLinearVelocity());
-		glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
-		glm::vec2 f = pBody->getMass() * (v - u) / moveTime;
-		pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply force
+	void Update(float stepTime)
+	{
 		PhysicsObject::Update();
+		//move
+		glm::vec3 worldV = glm::rotate(glm::quat(0.00f, 0.00f, 0.00f, 1.00f), -mainCamera->GetAngle() + PI, glm::vec3(0.00f, 1.00f, 0.00f))
+			* glm::vec3(moveDir.x, 0.00f, moveDir.y); //get the move direction relative to the camera's forward direction
+		glm::vec2 v = glm::vec2(worldV.x * moveSpeed, worldV.z * moveSpeed); //get target move speed
+		glm::vec3 current = FromPxVec(pBody->getLinearVelocity()); //current move speed
+		glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
+		glm::vec2 f = pBody->getMass() * (v - u) / moveTime; //calculate the force
+		//rotate
+		if (glm::length(moveDir) > 0.00f) //if we are actually moving
+		{
+			glm::vec3 pForward = rot * glm::vec3(0.00f, 0.00f, 1.00f); //get local forward in global space
+			glm::vec2 playerForward = glm::normalize(glm::vec2(pForward.x, pForward.z)); //normalize without y component (removes pitch)
+			float angle = glm::orientedAngle(glm::vec3(playerForward.x, 0.00f, playerForward.y), glm::normalize(worldV), glm::vec3(0.00f, 1.00f, 0.00f)); //get angle between global forward and global move direction
+			if (glm::abs(angle) > 0.025f) //if the angle to rotate is greater than a tolerance
+			{ //this tolerance stops overshooting with the else statement, and also stops infinite forces (A = ../2*angle) where an angle of 0 gives an A of infinity
+				constexpr float w = 2.00f * PI; //max angular velocity of 360 deg per sec (250ms for a 90 degree turn) about the y axis
+				float w0 = pBody->getAngularVelocity().y; //current angular velocity about the y axis
+				float A = (pow(w, 2) - pow(w0, 2)) / 2.00f * angle; //A = (v^2 - u^2)/2s
+				pBody->addTorque(PxVec3(0.00f, A * pBody->getMass(), 0.00f)); //F = m*a
+			}
+			else //if we are (basically) at the right angle
+			{
+				PxVec3 old = pBody->getAngularVelocity();
+				pBody->setAngularVelocity(PxVec3(old.x, 0.00f, old.z)); //stop rotating (this stops rotation from overshooting)
+			}
+		}
+		pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply movement force
 	}
 };
 

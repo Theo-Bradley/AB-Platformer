@@ -89,7 +89,7 @@ void main()
 {
 	float outline = Outline();
 	vec3 albedo = fma(outlineColor, vec3(outline), baseColor * (1.0 - outline));
-	vec3 shadowLight = vec3(SunShadow()) * SunDiffuse(); //we multiply them because they are the same light
+	vec3 shadowLight = vec3(clamp(SunShadow(), 0.0, 1.0)) * SunDiffuse(); //we multiply them because they are the same light
 	//SunShadow() gets the shadow from the shadow map, and SunDiffuse() calculates our shadow using sunPos
 	vec3 globalLight = baseColor * 0.1;
 	color = vec4(albedo * (shadowLight + globalLight), 1.0);
