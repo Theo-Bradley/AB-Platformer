@@ -50,6 +50,7 @@ Key k_Left = Key(key_Left);
 Key k_Backward = Key(key_Backward);
 Key k_Right = Key(key_Right);
 Key k_Toggle = Key(key_PlatformToggle);
+Key k_Jump = Key(key_Jump);
 
 class GLFramebufferMS : public GLFramebuffer
 {
@@ -571,20 +572,29 @@ protected:
 	glm::vec2 moveDir = glm::vec2(0.00f);
 	float moveSpeed = 6.67f; //max movement speed
 	float moveTime = 0.50f; //time to get to moveSpeed
+	float jumpForce = 666.67f;
+	bool shouldJump = false;
 
 public:
 	Player(glm::vec3 _pos, glm::quat _rot, Model* model)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.25f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
 	{
+		pBody->setRigidDynamicLockFlags(PxRigidDynamicLockFlag::eLOCK_ANGULAR_X | PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z);
 	}
 	Player(glm::vec3 _pos, glm::quat _rot, const char* path)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.25f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
+		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
 	{
+		pBody->setRigidDynamicLockFlags(PxRigidDynamicLockFlag::eLOCK_ANGULAR_X | PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z);
 	}
 
 	void MoveDir(glm::vec2 dir)
 	{
 		moveDir += dir;
+	}
+
+	void Jump()
+	{
+		shouldJump = true;
 	}
 
 	void Update(float stepTime)
@@ -603,7 +613,7 @@ public:
 			glm::vec3 pForward = rot * glm::vec3(0.00f, 0.00f, 1.00f); //get local forward in global space
 			glm::vec2 playerForward = glm::normalize(glm::vec2(pForward.x, pForward.z)); //normalize without y component (removes pitch)
 			float angle = glm::orientedAngle(glm::vec3(playerForward.x, 0.00f, playerForward.y), glm::normalize(worldV), glm::vec3(0.00f, 1.00f, 0.00f)); //get angle between global forward and global move direction
-			if (glm::abs(angle) > 0.025f) //if the angle to rotate is greater than a tolerance
+			if (glm::abs(angle) > 0.05f) //if the angle to rotate is greater than a tolerance
 			{ //this tolerance stops overshooting with the else statement, and also stops infinite forces (A = ../2*angle) where an angle of 0 gives an A of infinity
 				constexpr float w = 2.00f * PI; //max angular velocity of 360 deg per sec (250ms for a 90 degree turn) about the y axis
 				float w0 = pBody->getAngularVelocity().y; //current angular velocity about the y axis
@@ -617,6 +627,12 @@ public:
 			}
 		}
 		pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply movement force
+
+		if (shouldJump)
+		{
+			pBody->addForce(PxVec3(0.00f, pBody->getMass() * jumpForce, 0.00f));
+			shouldJump = false;
+		}
 	}
 };
 
@@ -741,6 +757,15 @@ void KeyDown(SDL_KeyboardEvent key)
 			TogglePlatforms();
 		}
 		break;
+	case(key_Jump):
+		if (k_Jump.Press())
+		{
+			if (player != nullptr)
+			{
+				player->Jump();
+			}
+		}
+		break;
 	}
 }
 
@@ -778,6 +803,9 @@ void KeyUp(SDL_KeyboardEvent key)
 		break;
 	case(key_PlatformToggle):
 		k_Toggle.Release();
+		break;
+	case(key_Jump):
+		k_Jump.Release();
 		break;
 	}
 }
