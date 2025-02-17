@@ -6,6 +6,8 @@ void KeyUp(SDL_KeyboardEvent key);
 void MouseMoved();
 void MouseWheel(SDL_MouseWheelEvent e);
 
+void LoadLevelTest();
+
 void PrintGLErrors()
 {
 	GLenum err;

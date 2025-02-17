@@ -1,7 +1,13 @@
 #version 450 core
 
-//adapted from https://roystan.net/articles/outline-shader/
-//to make better, read the fixing artefacts section (about viewangle)
+struct Light
+{
+	vec3 pos;
+	vec3 color;
+	float constant;
+    float linear;
+    float quadratic;
+};
 
 in vec4 sunFragPos;
 in vec3 normal;
@@ -21,6 +27,8 @@ uniform vec3 outlineColor = vec3(0.05, 0.05, 0.05);
 uniform vec3 baseColor = vec3(243.0/255.0, 223.0/255.0, 162.0/255.0);
 uniform vec3 sunPos;
 uniform vec3 camDir;
+#define NUM_LIGHTS 1
+uniform Light lights[NUM_LIGHTS];
 
 float linearize_depth(float d)
 {
@@ -56,6 +64,7 @@ vec3 SunDiffuse()
 
 float Outline()
 {
+	//adapted from https://roystan.net/articles/outline-shader/
 	vec2 screenSize = textureSize(normalMap, 0);
 	vec2 screenPos = gl_FragCoord.xy/screenSize; //get frag screen position in range 0-1
 	float minusOffset = -floor(lineThickness * 0.5); //get pixel offset for "left" of line
@@ -85,6 +94,18 @@ float Outline()
 	return max(depthDiff, normDiff);
 }
 
+vec3 PointLightDiffuse(Light light)
+{
+	//phong adapted from https://learnopengl.com/Lighting/Basic-Lighting
+	vec3 lightDir = light.pos - position; //get direction to light
+	float dist = length(lightDir);
+	lightDir = normalize(lightDir);
+	float value = max(dot(normal, lightDir), 0.0); //dot normal with light dir and clamp 0-1
+    float atten = 1.0 / (light.constant + light.linear * dist + 
+  			     light.quadratic * (dist * dist)); //replace line 105 with fma
+	return value * light.color * atten;
+}
+
 void main()
 {
 	float outline = Outline();
@@ -92,5 +113,10 @@ void main()
 	vec3 shadowLight = vec3(clamp(SunShadow(), 0.0, 1.0)) * SunDiffuse(); //we multiply them because they are the same light
 	//SunShadow() gets the shadow from the shadow map, and SunDiffuse() calculates our shadow using sunPos
 	vec3 globalLight = baseColor * 0.1;
-	color = vec4(albedo * (shadowLight + globalLight), 1.0);
+	vec3 pointLights = vec3(0.0, 0.0, 0.0);
+	for (int i = 0; i < NUM_LIGHTS; i++)
+	{
+		pointLights += PointLightDiffuse(lights[i]);
+	}
+	color = vec4(albedo * (shadowLight + globalLight + pointLights), 1.0);
 }

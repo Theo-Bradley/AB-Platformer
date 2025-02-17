@@ -5,3 +5,4 @@ directional light
 shadow stepping
 spot light
 point light
+fix movement wobbling when turning fast mid air (reduce turn speed?)

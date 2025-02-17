@@ -1,4 +1,4 @@
-#include "defines.h"
+#include "functions.h"
 
 struct Vertex
 {
@@ -331,6 +331,7 @@ public:
 	void SetUniforms()
 	{
 		glm::uint oldProgram = 0;
+		constexpr int numLights = 1;
 		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&oldProgram)); //get the active program
 		glUseProgram(program); //use our prog
 		glUniformMatrix4fv(glGetUniformLocation(program, "matrix"), 1, false, glm::value_ptr(mainCamera->GetCombinedMatrix())); //set the uniforms
@@ -338,6 +339,16 @@ public:
 		glUniform1i(glGetUniformLocation(program, "shadowMap"), 2);
 		glUniform1i(glGetUniformLocation(program, "normalMap"), 3);
 		glUniform1i(glGetUniformLocation(program, "depthMap"), 4);
+
+		for (int i = 0; i < numLights; i++)
+		{
+			std::string uniformName = "lights[" + std::to_string(i) + "]";
+			glUniform3f(glGetUniformLocation(program, (uniformName + ".position").c_str()), 0.5f, 1.5f, 0.5f);
+			glUniform3f(glGetUniformLocation(program, (uniformName + ".color").c_str()), 1.0f, 0.2f, 0.2f);
+			glUniform1f(glGetUniformLocation(program, (uniformName + ".constant").c_str()), 1.0f);
+			glUniform1f(glGetUniformLocation(program, (uniformName + ".linear").c_str()), 0.12f);
+			glUniform1f(glGetUniformLocation(program, (uniformName + ".quadratic").c_str()), 0.032f);
+		}
 		glUseProgram(oldProgram); //activate the previously active prog
 	}
 
@@ -346,11 +357,7 @@ public:
 		glm::uint oldProgram = 0;
 		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&oldProgram)); //get the active program
 		glUseProgram(program); //use our prog
-		glUniformMatrix4fv(glGetUniformLocation(program, "matrix"), 1, false, glm::value_ptr(mainCamera->GetCombinedMatrix())); //set the uniforms
-		glUniform3f(glGetUniformLocation(program, "camDir"), mainCamera->GetForward().x, -mainCamera->GetForward().y, mainCamera->GetForward().z);
-		glUniform1i(glGetUniformLocation(program, "shadowMap"), 2);
-		glUniform1i(glGetUniformLocation(program, "normalMap"), 3);
-		glUniform1i(glGetUniformLocation(program, "depthMap"), 4);
+		SetUniforms();
 		glUniformMatrix4fv(glGetUniformLocation(program, "sunMatrix"), 1, false, glm::value_ptr(sunMatrix)); //set the uniforms
 		glUniform3f(glGetUniformLocation(program, "sunPos"), sunPos.x, sunPos.y, sunPos.z);
 

@@ -14,7 +14,7 @@ uniform mat4 model;
 void main()
 {
 	gl_Position = matrix * model * vec4(pos.xyz, 1.0);
-	position = gl_Position.xyz;
-	normal = (model * vec4(norm, 0.0)).xyz;
+	position = (model * vec4(pos.xyz, 1.0)).xyz;
+	normal = normalize((model * vec4(norm, 0.0)).xyz);
 	sunFragPos = sunMatrix * model * vec4(pos.xyz, 1.0);
 }

@@ -19,7 +19,6 @@
 #include "assimp/Importer.hpp"
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
-#include "functions.h"
 #include "base_types.h"
 
 class Shader;
@@ -861,4 +860,9 @@ void TogglePlatforms()
 		std::for_each(BPlatforms.begin(), BPlatforms.end(), [&](Platform* platform) { platform->Enable(); });
 		platformToggle = true;
 	}
+}
+
+void LoadLevelTest()
+{
+
 }
