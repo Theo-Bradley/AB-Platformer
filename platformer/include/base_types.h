@@ -99,6 +99,7 @@ protected:
 	float angle;
 	float inclination;
 	float distance;
+	glm::vec3 position;
 	glm::mat4 view;
 	glm::mat4 projection;
 	glm::vec3 forward;
@@ -107,8 +108,8 @@ protected:
 	{
 		//sin(theta) z coord
 		//cos(theta) x coord
-		glm::vec3 cameraPos = glm::vec3(distance * glm::sin(angle), distance * glm::sin(inclination), distance * glm::cos(angle));
-		glm::mat4 matrix = glm::lookAt(target + cameraPos, target, glm::vec3(0.00f, 1.00f, 0.00f));
+		position = glm::vec3(distance * glm::sin(angle), distance * glm::sin(inclination), distance * glm::cos(angle));
+		glm::mat4 matrix = glm::lookAt(target + position, target, glm::vec3(0.00f, 1.00f, 0.00f));
 		forward = matrix * glm::vec4(0.00f, 0.00f, 1.00f, 0.00f);
 		return matrix;
 	}
@@ -117,8 +118,8 @@ protected:
 	{
 		//sin(theta) z coord
 		//cos(theta) x coord
-		glm::vec3 cameraPos = glm::vec3(distance * glm::sin(angle), distance * glm::sin(inclination), distance * glm::cos(angle));
-		glm::mat4 matrix = glm::lookAt(target.GetPosition() + cameraPos, target.GetPosition(), glm::vec3(0.00f, 1.00f, 0.00f));
+		position = glm::vec3(distance * glm::sin(angle), distance * glm::sin(inclination), distance * glm::cos(angle));
+		glm::mat4 matrix = glm::lookAt(target.GetPosition() + position, target.GetPosition(), glm::vec3(0.00f, 1.00f, 0.00f));
 		forward = matrix * glm::vec4(0.00f, 0.00f, 1.00f, 0.00f);
 		return matrix;
 	}
@@ -171,6 +172,11 @@ public:
 	void Follow(glm::vec3 target)
 	{
 		view = LookAt(target);
+	}
+
+	glm::vec3 GetPosition()
+	{
+		return position;
 	}
 
 	glm::mat4 GetView()
@@ -336,14 +342,16 @@ public:
 		glUseProgram(program); //use our prog
 		glUniformMatrix4fv(glGetUniformLocation(program, "matrix"), 1, false, glm::value_ptr(mainCamera->GetCombinedMatrix())); //set the uniforms
 		glUniform3f(glGetUniformLocation(program, "camDir"), mainCamera->GetForward().x, -mainCamera->GetForward().y, mainCamera->GetForward().z);
+		glUniform3f(glGetUniformLocation(program, "camPos"), mainCamera->GetPosition().x, mainCamera->GetPosition().y, mainCamera->GetPosition().z);
 		glUniform1i(glGetUniformLocation(program, "shadowMap"), 2);
 		glUniform1i(glGetUniformLocation(program, "normalMap"), 3);
 		glUniform1i(glGetUniformLocation(program, "depthMap"), 4);
 
 		for (int i = 0; i < numLights; i++)
 		{
+			float lightIntensity = 0.4f;
 			std::string uniformName = "lights[" + std::to_string(i) + "]";
-			glUniform3f(glGetUniformLocation(program, (uniformName + ".position").c_str()), 0.5f, 1.5f, 0.5f);
+			glUniform3f(glGetUniformLocation(program, (uniformName + ".position").c_str()), 0.5f * lightIntensity, 1.5f * lightIntensity, 0.5f * lightIntensity);
 			glUniform3f(glGetUniformLocation(program, (uniformName + ".color").c_str()), 1.0f, 0.2f, 0.2f);
 			glUniform1f(glGetUniformLocation(program, (uniformName + ".constant").c_str()), 1.0f);
 			glUniform1f(glGetUniformLocation(program, (uniformName + ".linear").c_str()), 0.12f);

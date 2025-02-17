@@ -27,6 +27,8 @@ uniform vec3 outlineColor = vec3(0.05, 0.05, 0.05);
 uniform vec3 baseColor = vec3(243.0/255.0, 223.0/255.0, 162.0/255.0);
 uniform vec3 sunPos;
 uniform vec3 camDir;
+uniform vec3 camPos;
+uniform vec3 sunColor = vec3(0.8, 0.8, 0.78);
 #define NUM_LIGHTS 1
 uniform Light lights[NUM_LIGHTS];
 
@@ -54,12 +56,32 @@ float SunShadow()
 	return clamp(1.0 - result, 0.0, 1.0);
 }
 
-vec3 SunDiffuse()
+float SunDiffuse()
 {
-	vec3 sunColor = vec3(1.0, 1.0, 1.0);
 	vec3 sunDir = normalize(sunPos);
-	float value = max(dot(normal, sunDir), 0.0);
-	return value * sunColor;
+	return smoothstep(0.0, 0.1, dot(normal, sunDir));
+}
+
+float SunSpecular()
+{
+	vec3 sunDir = normalize(sunPos);
+	vec3 viewDir = normalize(camPos - position);
+	vec3 reflectDir = reflect(-sunDir, normal);
+	float value = pow(max(dot(viewDir, reflectDir), 0.0), 256);
+	return smoothstep(0.96, 0.975, value);
+}
+
+vec3 PointLightDiffuse(Light light)
+{
+	//phong adapted from https://learnopengl.com/Lighting/Basic-Lighting
+	vec3 lightDir = light.pos - position; //get direction to light
+	float dist = length(lightDir);
+	lightDir = normalize(lightDir);
+	//float value = smoothstep(0.0, 0.1, dot(normal, lightDir)); //this is proper toon shading, but looks funny
+    float value = max(dot(normal, lightDir), 0.0); //dot normal with light dir and clamp 0-1
+	float atten = 1.0 / (light.constant + light.linear * dist + 
+  			     light.quadratic * (dist * dist)); //replace line 105 with fma
+	return value * light.color * atten;
 }
 
 float Outline()
@@ -94,23 +116,12 @@ float Outline()
 	return max(depthDiff, normDiff);
 }
 
-vec3 PointLightDiffuse(Light light)
-{
-	//phong adapted from https://learnopengl.com/Lighting/Basic-Lighting
-	vec3 lightDir = light.pos - position; //get direction to light
-	float dist = length(lightDir);
-	lightDir = normalize(lightDir);
-	float value = max(dot(normal, lightDir), 0.0); //dot normal with light dir and clamp 0-1
-    float atten = 1.0 / (light.constant + light.linear * dist + 
-  			     light.quadratic * (dist * dist)); //replace line 105 with fma
-	return value * light.color * atten;
-}
 
 void main()
 {
 	float outline = Outline();
 	vec3 albedo = fma(outlineColor, vec3(outline), baseColor * (1.0 - outline));
-	vec3 shadowLight = vec3(clamp(SunShadow(), 0.0, 1.0)) * SunDiffuse(); //we multiply them because they are the same light
+	vec3 sunLight = fma(SunShadow(), SunDiffuse(), SunSpecular()) * sunColor; //we multiply them because they are the same light
 	//SunShadow() gets the shadow from the shadow map, and SunDiffuse() calculates our shadow using sunPos
 	vec3 globalLight = baseColor * 0.1;
 	vec3 pointLights = vec3(0.0, 0.0, 0.0);
@@ -118,5 +129,5 @@ void main()
 	{
 		pointLights += PointLightDiffuse(lights[i]);
 	}
-	color = vec4(albedo * (shadowLight + globalLight + pointLights), 1.0);
+	color = vec4(albedo * (sunLight + globalLight + pointLights), 1.0);
 }
