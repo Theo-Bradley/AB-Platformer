@@ -864,5 +864,17 @@ void TogglePlatforms()
 
 void LoadLevelTest()
 {
-
+	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
+	PhysicsObject* pObject = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, copyModel);
+	pObjects.push_back(pObject);
+	drawModels.push_back(pObject);
+	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(12.60f, 1.00f, 12.50f), copyModel);
+	Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
+	APlatforms.push_back(platform);
+	drawModels.push_back(platform);
+	platform = new Platform(glm::vec3(-1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
+	platform->Disable();
+	BPlatforms.push_back(platform);
+	drawModels.push_back(platform);
+	delete copyModel;
 }

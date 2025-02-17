@@ -44,6 +44,12 @@ Camera* mainCamera;
 class Platform;
 std::vector<Platform*> APlatforms;
 std::vector<Platform*> BPlatforms;
+
+class Model;
+std::vector<Model*> drawModels;
+
+class PhysicsObject;
+std::vector<PhysicsObject*> pObjects;
 bool platformToggle = false;
 #endif
 

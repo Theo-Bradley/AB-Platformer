@@ -8,9 +8,7 @@ Shader* outlineBufferShader;
 Shader* outlineShader;
 File* testFile;
 Model* testModel;
-PhysicsObject* obj1;
-Platform* platformA;
-Platform* platformB;
+
 Sun* sun;
 
 int main(int argc, char** argv)
@@ -18,21 +16,8 @@ int main(int argc, char** argv)
 	bool running = true;
 	init();
 
-	outlineBufferShader = new Shader(Path("outline_buffer.vert"), Path("outline_buffer.frag"));
-	outlineBufferShader->SetUniforms();
+	LoadLevelTest();
 
-	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
-	obj1 = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, copyModel);
-	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(12.60f, 1.00f, 12.50f), copyModel);
-	platformA = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
-	platformB = new Platform(glm::vec3(-1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
-	platformB->Disable();
-	APlatforms.push_back(platformA);
-	BPlatforms.push_back(platformB);
-	delete copyModel;
-
-	sun = new Sun(glm::vec3(-5.00f, 4.00f, -1.00f));
-	
 	eTime = SDL_GetTicks();
 
 	while (running)
@@ -45,7 +30,7 @@ int main(int argc, char** argv)
 		pScene->simulate(fTime); //simulate by delta time
 		pScene->fetchResults(true); //wait for results
 
-		obj1->Update();
+		std::for_each(pObjects.begin(), pObjects.end(), [&](PhysicsObject* pObject) { pObject->Update(); });
 		if (player != nullptr)
 			player->Update(fTime);
 
@@ -123,6 +108,7 @@ int init()
 	errorShader->Use();
 	shadowShader = new Shader(Path("shadow.vert"), Path("basic.frag"));
 	outlineShader = new Shader(Path("outline.vert"), Path("outline.frag"));
+	outlineBufferShader = new Shader(Path("outline_buffer.vert"), Path("outline_buffer.frag"));
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
 	depthBuffer->GetColor()->Use(3);
@@ -131,6 +117,7 @@ int init()
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
 	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), Path("models/cube.obj"));
+	sun = new Sun(glm::vec3(-5.00f, 4.00f, -1.00f));
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -144,31 +131,25 @@ void Draw()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	outlineBufferShader->Use();
 	outlineBufferShader->SetUniforms();
-	obj1->Draw();
 	player->Draw();
-	platformA->Draw();
-	platformB->Draw();
+	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	groundPlane->Draw();
 
 	glEnable(GL_MULTISAMPLE);
 	sun->StartShadowPass(shadowShader);
-	obj1->Draw();
 	player->Draw();
 	groundPlane->Draw();
-	platformA->Draw();
-	platformB->Draw();
+	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	sun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
 	outlineShader->Use();
 	outlineShader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
-	obj1->Draw();
 	groundPlane->Draw();
 	if (player != nullptr)
 		player->Draw();
-	platformA->Draw();
-	platformB->Draw();
+	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 
 	PrintGLErrors();
 
