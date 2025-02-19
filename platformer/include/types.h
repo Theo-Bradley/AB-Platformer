@@ -522,7 +522,7 @@ public:
 	{
 		numFrames = numPaths;
 		frames = new Model* [numFrames];
-		for (int i = 0; i < numFrames; i++) //loop over meshes
+		for (unsigned int i = 0; i < numFrames; i++) //loop over meshes
 		{
 			Model* frame = new Model(paths[i].c_str(), _pos, _rot, _scale); //create new model for each frame
 			frames[i] = frame;
@@ -532,7 +532,7 @@ public:
 	void Draw(Shader* shader)
 	{
 		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor);
-		for (int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
+		for (unsigned int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
 		{
 			glBindVertexArray(frames[currentFrame]->GetMeshes()[i]->GetGLObject()->GetObject());
 			frames[currentFrame]->GetMeshes()[i]->GetGLObject()->SetupAttributes(2, frames[currentFrame + 1]->GetMeshes()[i]->GetGLObject()->GetAttribBuffer()->GetBuffer());
