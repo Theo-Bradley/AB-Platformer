@@ -42,6 +42,7 @@ int main(int argc, char** argv)
 		std::for_each(pObjects.begin(), pObjects.end(), [&](PhysicsObject* pObject) { pObject->Update(); });
 		if (player != nullptr)
 			player->Update(fTime);
+		animModel->SetFac(glm::abs(glm::sin(0.001f * eTime)));
 
 		mainCamera->Follow(player->GetPosition());
 		Draw();

@@ -514,6 +514,7 @@ protected:
 	unsigned int nextFrame = 0;
 	float startTime = 0.00f;
 	unsigned int numFrames;
+	float factor = 0.0;
 
 	float CalculateFac()
 	{
@@ -534,13 +535,18 @@ public:
 
 	void Draw(Shader* shader)
 	{
-		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), 0.5f);
+		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor);
 		for (int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
 		{
 			glBindVertexArray(frames[currentFrame]->GetMeshes()[i]->GetGLObject()->GetObject());
 			frames[currentFrame]->GetMeshes()[i]->GetGLObject()->SetupAttributes(2, frames[currentFrame + 1]->GetMeshes()[i]->GetGLObject()->GetAttribBuffer()->GetBuffer());
 			frames[currentFrame]->GetMeshes()[i]->Draw();
 		}
+	}
+
+	void SetFac(float val)
+	{
+		factor = val;
 	}
 };
 
