@@ -899,7 +899,7 @@ public:
 	{
 		unsigned int frame = 0; //time elapsed since start of anim in seconds
 		float t = 0.0f;
-		if (isPlaying && !isPaused)
+		if (isPlaying)
 		{
 			t = (eTime - startTime) / 1000.f;
 		}
@@ -919,16 +919,17 @@ public:
 		case (AnimationLoopType::loop):
 		{
 			float fNumFrames = (float)numFrames;
+			frame = roundf(modff((float)frame, &fNumFrames));
 			nextFrame = roundf(modff((float)nextFrame, &fNumFrames));
 			break;
 		}
 		case (AnimationLoopType::stop):
 		{
-			if (t >= frameTime * numFrames)
+			if (t >= frameTime * (numFrames - 1))
 			{
-				nextFrame = numFrames - 1;
 				isPlaying = false;
 				isPaused = false;
+				return frames[numFrames - 1]; //return last frame //not working
 			}
 			break;
 		}
