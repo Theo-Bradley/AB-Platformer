@@ -506,7 +506,7 @@ public:
 	}
 };
 
-class AnimatedModel
+class AnimatedModel: public Object
 {
 protected:
 	Model** frames;
@@ -516,13 +516,9 @@ protected:
 	unsigned int numFrames;
 	float factor = 0.0;
 
-	float CalculateFac()
-	{
-		
-	}
-
 public:
 	AnimatedModel(std::vector<std::string> paths, unsigned int numPaths, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale)
+		:Object(_pos, _rot, _scale)
 	{
 		numFrames = numPaths;
 		frames = new Model* [numFrames];
@@ -547,6 +543,78 @@ public:
 	void SetFac(float val)
 	{
 		factor = val;
+	}
+
+	void Move(glm::vec3 amt)
+	{
+		Object::Move(amt);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->Move(amt);
+			}
+		}
+	}
+
+	void Scale(glm::vec3 amt)
+	{
+		Object::Scale(amt);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->Scale(amt);
+			}
+		}
+	}
+
+	void Rotate(glm::quat _quat)
+	{
+		Object::Rotate(_quat);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->Rotate(_quat);
+			}
+		}
+	}
+
+	void SetPosition(glm::vec3 val)
+	{
+		Object::SetPosition(val);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->SetPosition(val);
+			}
+		}
+	}
+
+	void SetRotation(glm::quat val)
+	{
+		Object::SetRotation(val);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->SetRotation(val);
+			}
+		}
+	}
+
+	void SetScale(glm::vec3 val)
+	{
+		Object::SetScale(val);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->SetScale(val);
+			}
+		}
 	}
 };
 

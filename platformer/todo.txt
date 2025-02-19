@@ -6,3 +6,4 @@ shadow stepping
 spot light
 point light
 fix movement wobbling when turning fast mid air (reduce turn speed?)
+add animaton class and use it to set fac on animated model class
