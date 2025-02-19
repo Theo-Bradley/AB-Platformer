@@ -7,9 +7,8 @@ out vec3 screenSpaceNormal;
 
 uniform mat4 matrix;
 uniform mat4 model;
-
 void main()
 {
-	gl_Position = matrix * model * vec4(position.x, position.y, position.z, 1.0);
+	gl_Position = matrix * model * vec4(position, 1.0);
 	screenSpaceNormal = (matrix * model * vec4(norm, 0.0)).xyz;
 }

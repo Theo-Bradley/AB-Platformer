@@ -132,14 +132,14 @@ public:
 		renderObject = nullptr;
 	}
 
-	void InitializeRenderObject(void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
+	void InitializeRenderObject(void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize, int attribOffset = 0)
 	{
-		renderObject = new GLObject(attribData, attribSize, indexData, indexSize);
+		renderObject = new GLObject(attribData, attribSize, indexData, indexSize, attribOffset);
 	}
 
-	void InitializeRenderObject(void* attribData, unsigned int attribSize)
+	void InitializeRenderObject(void* attribData, unsigned int attribSize, int attribOffset = 0)
 	{
-		renderObject = new GLObject(attribData, attribSize);
+		renderObject = new GLObject(attribData, attribSize, attribOffset);
 	}
 
 	glm::mat4 CalculateModel()
@@ -165,6 +165,11 @@ public:
 		model = CalculateModel(); //get the updated model matrix
 		glUniformMatrix4fv(glGetUniformLocation(shader->GetProgram(), "model"), 1, false, glm::value_ptr(model)); //update the uniform in the shader to new matrix
 		renderObject->Draw(); //draw
+	}
+
+	GLObject* GetGLObject()
+	{
+		return renderObject;
 	}
 };
 
@@ -215,6 +220,64 @@ public:
 			}
 			//init the DrawableObject
 			DrawableObject::InitializeRenderObject(vertices, numVerts * sizeof(Vertex), faces, numFaces * 3 * sizeof(unsigned int));
+			//init the drawable object pos rot scale
+			parentPosition = FromAssimpVec(globalPos);
+			parentRotation = FromAssimpQuat(globalRot);
+			//parentRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+			parentScale = FromAssimpVec(globalScale);
+			DrawableObject::SetPosition(parentPosition); //set position from matrix
+			DrawableObject::SetRotation(parentRotation); //set rotation from matrix
+			DrawableObject::SetScale(parentScale); //set scale from matrix
+
+			delete[] vertices; //cleanup
+			delete[] faces; //cleanup
+			complete = true;
+		}
+		else
+		{
+			std::cout << "Error: Failed to create mesh! No vertices!\n";
+			return; //fail (no verts)
+		}
+	}
+
+	Mesh(aiMesh* mesh, aiMatrix4x4 globalTransform, int attributeOffset)
+	{
+		glm::mat4 transform = FromAssimpMat(globalTransform);//get global transform
+		aiVector3f globalPos;
+		aiQuaternion globalRot;
+		aiVector3f globalScale;
+		globalTransform.Decompose(globalScale, globalRot, globalPos);
+		unsigned int numVerts = mesh->mNumVertices;
+		if (numVerts > 0)
+		{
+			Vertex* vertices = new Vertex[numVerts];
+			for (unsigned int vert = 0; vert < numVerts; vert++)
+			{
+				Vertex vertex = Vertex{ FromAssimpVec(mesh->mVertices[vert]),
+					FromAssimpVec(mesh->mNormals[vert]),
+					glm::vec2(mesh->mTextureCoords[0][vert].x, mesh->mTextureCoords[0][vert].y) };
+				vertices[vert] = vertex;
+			}
+			unsigned int numFaces = mesh->mNumFaces; //get number of faces
+			unsigned int* faces = new unsigned int[numFaces * 3]; //3 indices per face
+			for (unsigned int face = 0; face < numFaces; face++) //loop over faces
+			{
+				aiFace currFace = mesh->mFaces[face];
+				if (currFace.mNumIndices == 3) //make sure its a triangle
+				{
+					faces[face * 3] = currFace.mIndices[0]; //set each index
+					faces[face * 3 + 1] = currFace.mIndices[1];
+					faces[face * 3 + 2] = currFace.mIndices[2];
+				}
+				else
+				{
+					delete[] faces;
+					std::cout << "Error: Failed to create mesh indices!: Face not a triangle! \n";
+					return; //fail not a triangle
+				}
+			}
+			//init the DrawableObject
+			DrawableObject::InitializeRenderObject(vertices, numVerts * sizeof(Vertex), faces, numFaces * 3 * sizeof(unsigned int), attributeOffset);
 			//init the drawable object pos rot scale
 			parentPosition = FromAssimpVec(globalPos);
 			parentRotation = FromAssimpQuat(globalRot);
@@ -443,6 +506,44 @@ public:
 	}
 };
 
+class AnimatedModel
+{
+protected:
+	Model** frames;
+	unsigned int currentFrame = 0;
+	unsigned int nextFrame = 0;
+	float startTime = 0.00f;
+	unsigned int numFrames;
+
+	float CalculateFac()
+	{
+		
+	}
+
+public:
+	AnimatedModel(std::vector<std::string> paths, unsigned int numPaths, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale)
+	{
+		numFrames = numPaths;
+		frames = new Model* [numFrames];
+		for (int i = 0; i < numFrames; i++) //loop over meshes
+		{
+			Model* frame = new Model(paths[i].c_str(), _pos, _rot, _scale); //create new model for each frame
+			frames[i] = frame;
+		}
+	}
+
+	void Draw(Shader* shader)
+	{
+		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), 0.5f);
+		for (int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
+		{
+			glBindVertexArray(frames[currentFrame]->GetMeshes()[i]->GetGLObject()->GetObject());
+			frames[currentFrame]->GetMeshes()[i]->GetGLObject()->SetupAttributes(2, frames[currentFrame + 1]->GetMeshes()[i]->GetGLObject()->GetAttribBuffer()->GetBuffer());
+			frames[currentFrame]->GetMeshes()[i]->Draw();
+		}
+	}
+};
+
 class PhysicsObject: public Model
 {
 protected:
@@ -571,7 +672,7 @@ protected:
 	glm::vec2 moveDir = glm::vec2(0.00f);
 	float moveSpeed = 6.67f; //max movement speed
 	float moveTime = 0.50f; //time to get to moveSpeed
-	float jumpForce = 666.67f;
+	float jumpForce = 6.00f;
 	bool shouldJump = false;
 
 public:
@@ -617,7 +718,7 @@ public:
 				constexpr float w = 2.00f * PI; //max angular velocity of 360 deg per sec (250ms for a 90 degree turn) about the y axis
 				float w0 = pBody->getAngularVelocity().y; //current angular velocity about the y axis
 				float A = (pow(w, 2) - pow(w0, 2)) / 2.00f * angle; //A = (v^2 - u^2)/2s
-				pBody->addTorque(PxVec3(0.00f, A * pBody->getMass(), 0.00f)); //F = m*a
+				pBody->addTorque(PxVec3(0.00f, A * pBody->getMass(), 0.00f), PxForceMode::eFORCE); //F = m*a
 			}
 			else //if we are (basically) at the right angle
 			{
@@ -629,7 +730,8 @@ public:
 
 		if (shouldJump)
 		{
-			pBody->addForce(PxVec3(0.00f, pBody->getMass() * jumpForce, 0.00f));
+			pBody->addForce(PxVec3(0.00f, pBody->getMass() * jumpForce, 0.00f)
+		, PxForceMode::eIMPULSE);
 			shouldJump = false;
 		}
 	}

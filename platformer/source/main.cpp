@@ -6,8 +6,12 @@ void Draw();
 
 Shader* outlineBufferShader;
 Shader* outlineShader;
+Shader* animatedOutlineShader;
+Shader* animatedShadowShader;
+Shader* animatedOutlineBufferShader;
 File* testFile;
 Model* testModel;
+AnimatedModel* animModel;
 
 Sun* sun;
 
@@ -17,6 +21,11 @@ int main(int argc, char** argv)
 	init();
 
 	LoadLevelTest();
+	std::vector < std::string > paths;
+	paths.push_back(Path("models/cube.obj"));
+	paths.push_back(Path("models/cube1.obj"));
+
+	animModel = new AnimatedModel(paths, 2, glm::vec3(0.00f, 1.50f, 0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.00f));
 
 	eTime = SDL_GetTicks();
 
@@ -107,8 +116,11 @@ int init()
 	errorShader = new Shader(true);
 	errorShader->Use();
 	shadowShader = new Shader(Path("shadow.vert"), Path("basic.frag"));
+	animatedShadowShader = new Shader(Path("shadow_animated.vert"), Path("basic.frag"));
 	outlineShader = new Shader(Path("outline.vert"), Path("outline.frag"));
+	animatedOutlineShader = new Shader(Path("outline_animated.vert"), Path("outline.frag"));
 	outlineBufferShader = new Shader(Path("outline_buffer.vert"), Path("outline_buffer.frag"));
+	animatedOutlineBufferShader = new Shader(Path("outline_buffer_animated.vert"), Path("outline_buffer.frag"));
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
 	depthBuffer->GetColor()->Use(3);
@@ -134,12 +146,18 @@ void Draw()
 	player->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	groundPlane->Draw();
+	animatedOutlineBufferShader->Use();
+	animatedOutlineBufferShader->SetUniforms();
+	animModel->Draw(animatedOutlineBufferShader);
 
 	glEnable(GL_MULTISAMPLE);
 	sun->StartShadowPass(shadowShader);
 	player->Draw();
 	groundPlane->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
+	animatedShadowShader->Use();
+	animatedShadowShader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
+	animModel->Draw(animatedShadowShader);
 	sun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -151,6 +169,9 @@ void Draw()
 		player->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 
+	animatedOutlineShader->Use();
+	animatedOutlineShader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
+	animModel->Draw(animatedOutlineShader);
 	PrintGLErrors();
 
 	SDL_GL_SwapWindow(window);

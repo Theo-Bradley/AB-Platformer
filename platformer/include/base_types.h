@@ -676,7 +676,7 @@ protected:
 	glm::uint object = 0;
 
 public:
-	GLObject(void* attribData, unsigned int size)
+	GLObject(void* attribData, unsigned int size, int attribOffset = 0)
 	{
 		attribBuffer = new GLBuffer(attribData, size); //create vertex attribute buffer
 		indexBuffer = nullptr; //no index buffer
@@ -685,11 +685,11 @@ public:
 		glGenVertexArrays(1, &object); //generate the VAO
 		glBindVertexArray(object); //bind it
 		glBindBuffer(GL_ARRAY_BUFFER, attribBuffer->GetBuffer()); //bind the attrib buff to the VAO
-		SetupAttributes(); //setup the vertex attributes
+		SetupAttributes(attribOffset); //setup the vertex attributes
 		glBindVertexArray(0); //unbind for safety
 	}
 
-	GLObject(void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
+	GLObject(void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize, int attribOffset = 0)
 	{
 		attribBuffer = new GLBuffer(attribData, attribSize); //create vertex attribute buffer
 		indexBuffer = new GLBuffer(indexData, indexSize); //create vertex index buffer
@@ -699,7 +699,7 @@ public:
 		glBindVertexArray(object); //..
 		glBindBuffer(GL_ARRAY_BUFFER, attribBuffer->GetBuffer()); //..
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->GetBuffer()); //bind the index buff to VAO
-		SetupAttributes(); //..
+		SetupAttributes(attribOffset); //..
 		glBindVertexArray(0); //..
 	}
 
@@ -736,6 +736,23 @@ public:
 		glEnableVertexAttribArray(1);
 	}
 
+	void SetupAttributes(int offset)
+	{
+		glVertexAttribPointer(0 + offset, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0); //index, count, type, normalize?, stride, offset
+		glEnableVertexAttribArray(0 + offset); //enable attribute
+		glVertexAttribPointer(1 + offset, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Vertex::normal));
+		glEnableVertexAttribArray(1 + offset);
+	}
+
+	void SetupAttributes(int offset, int buffer)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, buffer); //bind buffer
+		glVertexAttribPointer(0 + offset, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0); //index, count, type, normalize?, stride, offset
+		glEnableVertexAttribArray(0 + offset); //enable attribute
+		glVertexAttribPointer(1 + offset, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Vertex::normal));
+		glEnableVertexAttribArray(1 + offset);
+	}
+
 	void Draw()
 	{
 		glBindVertexArray(object);
@@ -744,6 +761,21 @@ public:
 		else //if not using vertex indices
 			glDrawArrays(GL_TRIANGLES, 0, triCount); //regular draw
 		glBindVertexArray(0);
+	}
+
+	GLBuffer* GetAttribBuffer()
+	{
+		return attribBuffer;
+	}
+
+	GLBuffer* GetIndexBuffer()
+	{
+		return indexBuffer;
+	}
+
+	unsigned int GetObject()
+	{
+		return object;
 	}
 };
 
@@ -783,5 +815,31 @@ public:
 			return true;
 		}
 		return false;
+	}
+};
+
+template <typename T>
+class Animation
+{
+protected:
+	T* frames;
+	unsigned int numFrames;
+
+public:
+	Animation()
+	{
+		frames = nullptr;
+		numFrames = 0;
+	}
+
+	Animation(T* copyFrames, unsigned int _numFrames)
+	{
+		numFrames = _numFrames;
+		frames = new T[numFrames];
+
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			frames[i] = copyFrames[i];
+		}
 	}
 };
