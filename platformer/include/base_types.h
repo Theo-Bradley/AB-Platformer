@@ -818,22 +818,39 @@ public:
 	}
 };
 
+enum class AnimationLoopType
+{
+	loop,
+	clamp,
+	stop
+};
+
 template <typename T>
 class Animation
 {
 protected:
 	T* frames;
 	unsigned int numFrames;
+	AnimationLoopType loopType;
+	bool isPlaying = false;
+	bool isPaused = false;
+	unsigned long long startTime; //start time in MS
+	unsigned long long pauseTime; //time anim was paused in MS
+	float frameTime;
 
 public:
 	Animation()
 	{
 		frames = nullptr;
 		numFrames = 0;
+		loopType = AnimationLoopType::stop;
+		frameTime = 0;
 	}
 
-	Animation(T* copyFrames, unsigned int _numFrames)
+	Animation(T* copyFrames, unsigned int _numFrames, float timePerFrame, AnimationLoopType _loopType = AnimationLoopType::stop)
 	{
+		loopType = _loopType;
+		frameTime = timePerFrame;
 		numFrames = _numFrames;
 		frames = new T[numFrames];
 
@@ -841,5 +858,78 @@ public:
 		{
 			frames[i] = copyFrames[i];
 		}
+	}
+
+	void Start(unsigned long long eTime)
+	{
+		startTime = eTime; //start from begining
+		isPlaying = true;
+		isPaused = false;
+	}
+
+	void Stop()
+	{
+		isPlaying = false;
+		isPaused = false;
+	}
+
+	void Play(unsigned long long eTime)
+	{
+		if (isPaused) //if was paused
+		{
+			startTime = startTime + (eTime - pauseTime); //advance startTime by time elapsed since paused
+		}
+		else
+		{
+			if (!isPlaying) //if was stopped
+				startTime = eTime; //start from begining
+		}
+		isPlaying = true;
+		isPaused = false;
+	}
+
+	void Pause(unsigned long long eTime)
+	{
+		isPlaying = false;
+		isPaused = true;
+		pauseTime = eTime;
+	}
+
+	T GetFrame(unsigned long long eTime)
+	{
+		float animTime = startTime; //time elapsed since start of anim in seconds
+		if (isPlaying && !isPaused)
+		{
+			animTime = (float)(eTime - startTime) / frameTime * 1000 * numFrames; //time elapsed since start of anim in seconds
+		}
+		if (isPaused)
+		{
+			animTime = (float)(pauseTime - startTime) / frameTime * 1000 * numFrames; //time elapsed before pausing
+		}
+		unsigned int frame = roundf(animTime / frameTime * numFrames);
+		switch (loopType)
+		{
+			case (AnimationLoopType::clamp)
+			{
+				frame = clamp(frame, 0, numFrames);
+				break;
+			}
+			case (AnimationLoopType::loop)
+			{
+				frame = roundf(modff(frame, numFrames));
+				break;
+			}
+			case (AnimationLoopType::stop)
+			{
+				if (frame >= numFrames)
+				{
+					frame = numFrames - 1;
+					isPlaying = false;
+					isPaused = false;
+				}
+				break;
+			}
+		}
+		return frames[frame];
 	}
 };
