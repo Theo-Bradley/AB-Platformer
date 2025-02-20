@@ -912,15 +912,18 @@ public:
 		{
 		case (AnimationLoopType::clamp):
 		{
-			//nextFrame = glm::clamp((float)nextFrame, 0.00f, (float)numFrames);
+			if (time >= frameTime * (numFrames - 1)) //if time is greater than animation length
+			{
+				return frames[numFrames - 1]; //return last frame
+			}
 			break;
 		}
 		case (AnimationLoopType::loop):
 		{
-			if (time >= frameTime * (numFrames - 1))
+			if (time >= frameTime * (numFrames - 1)) //if time is greater than animation length
 			{
-				startTime += (int)glm::round(frameTime * 1000) * (numFrames - 1);
-				time = (eTime - startTime) / 1000.f;
+				startTime += (int)glm::round(frameTime * 1000) * (numFrames - 1); //increment start time by one animation length
+				time = (eTime - startTime) / 1000.f; //recalc the time
 			}
 			break;
 		}
@@ -930,13 +933,13 @@ public:
 			{
 				isPlaying = false;
 				isPaused = false;
-				return frames[numFrames - 1]; //return last frame //not working
+				return frames[numFrames - 1]; //return last frame
 			}
 			break;
 		}
 		}
 		frame = glm::floor(time / frameTime);
-		unsigned int nextFrame = frame + 1;
+		unsigned int nextFrame = (frame + 1) % numFrames;
 		return frames[frame] + (time / frameTime) * (frames[nextFrame] - frames[frame]);
 	}
 };
