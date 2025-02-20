@@ -27,7 +27,7 @@ int main(int argc, char** argv)
 
 	animModel = new AnimatedModel(paths, 2, glm::vec3(0.00f, 1.50f, 0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.00f));
 	float frames[2] = { 0.0f, 1.0f };
-	Animation<float> fAnim = Animation(frames, 2, 5.00f);
+	Animation<float> fAnim = Animation(frames, 2, 5.00f, AnimationLoopType::loop);
 
 	eTime = SDL_GetTicks();
 

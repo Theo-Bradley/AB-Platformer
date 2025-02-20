@@ -837,6 +837,7 @@ protected:
 	unsigned long long startTime; //start time in MS
 	unsigned long long pauseTime; //time anim was paused in MS
 	float frameTime;
+	float time = 0.00f;
 
 public:
 	Animation()
@@ -897,35 +898,35 @@ public:
 
 	T GetFrame(unsigned long long eTime)
 	{
-		unsigned int frame = 0; //time elapsed since start of anim in seconds
-		float t = 0.0f;
+		unsigned int frame = 0;
 		if (isPlaying)
 		{
-			t = (eTime - startTime) / 1000.f;
+			time = (eTime - startTime) / 1000.f;
 		}
 		if (isPaused)
 		{
-			t = (pauseTime - startTime) / 1000.f;
+			time = (pauseTime - startTime) / 1000.f;
 		}
-		frame = glm::floor(t / frameTime);
-		unsigned int nextFrame = frame + 1;
+
 		switch (loopType)
 		{
 		case (AnimationLoopType::clamp):
 		{
-			nextFrame = glm::clamp((float)nextFrame, 0.00f, (float)numFrames);
+			//nextFrame = glm::clamp((float)nextFrame, 0.00f, (float)numFrames);
 			break;
 		}
 		case (AnimationLoopType::loop):
 		{
-			float fNumFrames = (float)numFrames;
-			frame = roundf(modff((float)frame, &fNumFrames));
-			nextFrame = roundf(modff((float)nextFrame, &fNumFrames));
+			if (time >= frameTime * (numFrames - 1))
+			{
+				startTime += (int)glm::round(frameTime * 1000) * (numFrames - 1);
+				time = (eTime - startTime) / 1000.f;
+			}
 			break;
 		}
 		case (AnimationLoopType::stop):
 		{
-			if (t >= frameTime * (numFrames - 1))
+			if (time >= frameTime * (numFrames - 1))
 			{
 				isPlaying = false;
 				isPaused = false;
@@ -934,6 +935,8 @@ public:
 			break;
 		}
 		}
-		return frames[frame] + (t / frameTime)* (frames[nextFrame] - frames[frame]);
+		frame = glm::floor(time / frameTime);
+		unsigned int nextFrame = frame + 1;
+		return frames[frame] + (time / frameTime) * (frames[nextFrame] - frames[frame]);
 	}
 };
