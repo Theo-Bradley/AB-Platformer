@@ -46,7 +46,6 @@ int main(int argc, char** argv)
 		std::for_each(pObjects.begin(), pObjects.end(), [&](PhysicsObject* pObject) { pObject->Update(); });
 		if (player != nullptr)
 			player->Update(fTime);
-		animModel->SetFac(glm::abs(glm::sin(0.001f * eTime)));
 
 		mainCamera->Follow(player->GetPosition());
 		Draw();
@@ -155,7 +154,7 @@ void Draw()
 	groundPlane->Draw();
 	animatedOutlineBufferShader->Use();
 	animatedOutlineBufferShader->SetUniforms();
-	animModel->Draw(animatedOutlineBufferShader);
+	animModel->Draw(animatedOutlineBufferShader, eTime);
 
 	glEnable(GL_MULTISAMPLE);
 	sun->StartShadowPass(shadowShader);
@@ -164,7 +163,7 @@ void Draw()
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	animatedShadowShader->Use();
 	animatedShadowShader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
-	animModel->Draw(animatedShadowShader);
+	animModel->Draw(animatedShadowShader, eTime);
 	sun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -178,7 +177,7 @@ void Draw()
 
 	animatedOutlineShader->Use();
 	animatedOutlineShader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
-	animModel->Draw(animatedOutlineShader);
+	animModel->Draw(animatedOutlineShader, eTime);
 	PrintGLErrors();
 
 	SDL_GL_SwapWindow(window);

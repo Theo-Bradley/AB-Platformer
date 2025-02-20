@@ -38,8 +38,6 @@ PxScene* pScene;
 PxMaterial* pMaterial;
 PxPvd* pPvd;
 GLFramebuffer* depthBuffer;
-unsigned long long int eTime = 0;
-unsigned long long dTime = 1;
 Player* player;
 Shader* shadowShader;
 Platform* groundPlane;
@@ -514,7 +512,7 @@ protected:
 	unsigned int nextFrame = 0;
 	float startTime = 0.00f;
 	unsigned int numFrames;
-	float factor = 0.0;
+	Animation<float>* factor;
 
 public:
 	AnimatedModel(std::vector<std::string> paths, unsigned int numPaths, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale)
@@ -527,22 +525,20 @@ public:
 			Model* frame = new Model(paths[i].c_str(), _pos, _rot, _scale); //create new model for each frame
 			frames[i] = frame;
 		}
+		float factorFrames[2] = { 0.0f, 1.0f };
+		factor = new Animation<float>(factorFrames, 2, 1.0f, AnimationLoopType::loop);
+		factor->Play(eTime);
 	}
 
-	void Draw(Shader* shader)
+	void Draw(Shader* shader, unsigned long long eTime)
 	{
-		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor);
+		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor->GetFrame(eTime));
 		for (unsigned int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
 		{
 			glBindVertexArray(frames[currentFrame]->GetMeshes()[i]->GetGLObject()->GetObject());
 			frames[currentFrame]->GetMeshes()[i]->GetGLObject()->SetupAttributes(2, frames[currentFrame + 1]->GetMeshes()[i]->GetGLObject()->GetAttribBuffer()->GetBuffer());
 			frames[currentFrame]->GetMeshes()[i]->Draw();
 		}
-	}
-
-	void SetFac(float val)
-	{
-		factor = val;
 	}
 
 	void Move(glm::vec3 amt)

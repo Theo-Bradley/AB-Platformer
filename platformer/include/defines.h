@@ -34,6 +34,8 @@ const char* errorFrag = { "#version 450 core\n"
 
 float screenWidth, screenHeight;
 float sensitivity = 0.66f;
+unsigned long long int eTime = 0;
+unsigned long long dTime = 1;
 
 class Shader;
 Shader* errorShader = nullptr;
