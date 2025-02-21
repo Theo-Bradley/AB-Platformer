@@ -406,8 +406,8 @@ public:
 		//process node
 		for (unsigned int meshNum = 0; meshNum < node->mNumMeshes; meshNum++) //loop over meshes on node
 		{
-			Mesh* mesh = new Mesh(scene->mMeshes[node->mMeshes[meshNum]], transform); //create a Mesh from the aiMesh
-			meshes[meshNum] = mesh; //store
+			if (meshes[node->mMeshes[meshNum]] != nullptr) //if we didn't already load this mesh
+				meshes[node->mMeshes[meshNum]] = new Mesh(scene->mMeshes[node->mMeshes[meshNum]], transform); //create a Mesh from the aiMesh and store it
 		}
 
 		//traverse children

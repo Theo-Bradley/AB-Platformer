@@ -20,7 +20,7 @@ uniform sampler2D shadowMap;
 uniform float lineThickness = 4;
 uniform float depthThresh = 0.05;
 uniform float threshViewAngleMul = 16.0;
-uniform float normThresh = 0.1;
+uniform float normThresh = 0.5;
 uniform float zNear = 0.1;
 uniform float zFar = 5.0;
 uniform vec3 outlineColor = vec3(0.05, 0.05, 0.05);

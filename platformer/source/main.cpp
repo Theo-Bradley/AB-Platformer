@@ -134,7 +134,7 @@ int init()
 
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
-	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), Path("models/cube.obj"));
+	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), Path("models/robot_idle.obj"));
 	sun = new Sun(glm::vec3(-5.00f, 4.00f, -1.00f));
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
