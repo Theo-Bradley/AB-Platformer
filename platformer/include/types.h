@@ -665,6 +665,12 @@ public:
 		factor = new Animation<float>(factorFrames, 2, 0.3f);
 	}
 
+	~AnimatedObject()
+	{
+		delete[] frames;
+		delete factor;
+	}
+
 	void Draw(Shader* shader)
 	{
 		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor->GetFrame());
@@ -771,6 +777,12 @@ public:
 		}
 		float factorFrames[2] = { 0.0f, 1.0f };
 		factor = new Animation<float>(factorFrames, 2, 0.3f);
+	}
+
+	~AnimatedPhysicsObject()
+	{
+		delete[] frames;
+		delete factor;
 	}
 
 	void Draw(Shader* shader)

@@ -861,6 +861,11 @@ public:
 		}
 	}
 
+	~Animation()
+	{
+		delete[] frames;
+	}
+
 	void Start()
 	{
 		startTime = eTime; //start from begining
