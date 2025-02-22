@@ -861,9 +861,9 @@ public:
 		}
 	}
 
-	void Start(unsigned long long currentTime)
+	void Start()
 	{
-		startTime = currentTime; //start from begining
+		startTime = eTime; //start from begining
 		isPlaying = true;
 		isPaused = false;
 	}
@@ -874,34 +874,34 @@ public:
 		isPaused = false;
 	}
 
-	void Play(unsigned long long currentTime)
+	void Play()
 	{
 		if (isPaused) //if was paused
 		{
-			startTime = startTime + (currentTime - pauseTime); //advance startTime by time elapsed since paused
+			startTime = startTime + (eTime - pauseTime); //advance startTime by time elapsed since paused
 		}
 		else
 		{
 			if (!isPlaying) //if was stopped
-				startTime = currentTime; //start from begining
+				startTime = eTime; //start from begining
 		}
 		isPlaying = true;
 		isPaused = false;
 	}
 
-	void Pause(unsigned long long currentTime)
+	void Pause()
 	{
 		isPlaying = false;
 		isPaused = true;
-		pauseTime = currentTime;
+		pauseTime = eTime;
 	}
 
-	T GetFrame(unsigned long long currentTime)
+	T GetFrame()
 	{
 		unsigned int frame = 0;
 		if (isPlaying)
 		{
-			time = (currentTime - startTime) / 1000.f;
+			time = (eTime - startTime) / 1000.f;
 		}
 		if (isPaused)
 		{
@@ -923,7 +923,7 @@ public:
 			if (time >= frameTime * (numFrames - 1)) //if time is greater than animation length
 			{
 				startTime += (int)glm::round(frameTime * 1000) * (numFrames - 1); //increment start time by one animation length
-				time = (currentTime - startTime) / 1000.f; //recalc the time
+				time = (eTime - startTime) / 1000.f; //recalc the time
 			}
 			break;
 		}
@@ -942,4 +942,10 @@ public:
 		unsigned int nextFrame = (frame + 1) % numFrames;
 		return frames[frame] + (time / frameTime) * (frames[nextFrame] - frames[frame]);
 	}
+};
+
+struct BoxCollider
+{
+	PxVec3 center;
+	PxVec3 size;
 };

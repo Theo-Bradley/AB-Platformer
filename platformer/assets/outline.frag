@@ -17,10 +17,10 @@ out vec4 color;
 uniform sampler2D normalMap;
 uniform sampler2D depthMap;
 uniform sampler2D shadowMap;
-uniform float lineThickness = 4;
+uniform float lineThickness = 2;
 uniform float depthThresh = 0.05;
 uniform float threshViewAngleMul = 16.0;
-uniform float normThresh = 0.5;
+uniform float normThresh = 0.4;
 uniform float zNear = 0.1;
 uniform float zFar = 5.0;
 uniform vec3 outlineColor = vec3(0.05, 0.05, 0.05);
@@ -112,7 +112,7 @@ float Outline()
 	vec3 nTR = texture(normalMap, uvTR).rgb;
 	float normDiff = sqrt(dot(nBL - nTR, nBL - nTR) + dot(nTL - nBR, nTL - nBR));
 	normDiff = normDiff > normThresh ? 1.0 : 0.0;
-
+	
 	return max(depthDiff, normDiff);
 }
 

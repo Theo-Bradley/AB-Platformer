@@ -7,3 +7,6 @@ spot light
 point light
 fix movement wobbling when turning fast mid air (reduce turn speed?)
 add animaton class and use it to set fac on animated model class
+Add code to change collider size on physics object
+Add destructor to AnimatedObject and AnimatedModel
+Add Start Stop Play Pause to AnimatedObject and AnimatedPhysicsObject

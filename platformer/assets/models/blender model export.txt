@@ -1,0 +1,7 @@
+Geometry:
+Triangulate faces
+Keep Vertex Order
+
+Robot:
+X forward
+scale 0.1

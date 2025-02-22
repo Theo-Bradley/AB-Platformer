@@ -338,7 +338,7 @@ public:
 	{
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(path,
-			aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_GenSmoothNormals); //load scene
+			aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_GenSmoothNormals); //load scene
 		if (scene == nullptr)
 		{
 			std::cout << "Failed to make Model: Failed to load Scene at " << path << "\n";
@@ -504,7 +504,143 @@ public:
 	}
 };
 
-class AnimatedModel: public Object
+class PhysicsObject: public Object
+{
+protected:
+	PxRigidDynamic* pBody;
+	PxMaterial* pMaterial;
+	PxVec3 colliderOffset;
+
+	void CreatePBody(MaterialProperties materialProperties)
+	{
+		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
+		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
+		colliderOffset = PxVec3(0.00f, 0.00f, 0.00f);
+		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
+		pBody = pPhysics->createRigidDynamic(transform); //create the dynamic rigidbody
+		pBody->attachShape(*pShape); //attatch the shape to it
+		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
+		pBody->setAngularDamping(0.10f);
+		pScene->addActor(*pBody); //add rigid body to scene
+		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
+	}
+
+	void CreatePBody(MaterialProperties materialProperties, BoxCollider collider)
+	{
+		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
+		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(collider.size / 2.00f), *pMaterial, true); //create the associated shape
+		colliderOffset = collider.center;
+		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
+		pBody = pPhysics->createRigidDynamic(transform); //create the dynamic rigidbody
+		pBody->attachShape(*pShape); //attatch the shape to it
+		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
+		pBody->setAngularDamping(0.10f);
+		pScene->addActor(*pBody); //add rigid body to scene
+		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
+	}
+
+public:
+	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties)
+	:Object(pos, _rot, scale) {
+		CreatePBody(materialProperties);
+	}
+
+	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, BoxCollider collider, MaterialProperties materialProperties)
+		:Object(pos, _rot, scale) {
+		CreatePBody(materialProperties, collider);
+	}
+
+	~PhysicsObject()
+	{
+		pScene->removeActor(*pBody); //remove from the scene
+		PX_RELEASE(pBody); //free the memory
+	}
+
+	void Update()
+	{
+		PxTransform transform = pBody->getGlobalPose(); //get the current "pose"
+		Object::SetPosition(FromPxVec(transform.p - colliderOffset)); //update the model position
+		Object::SetRotation(glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z)); //apply new rotation
+	}
+
+	virtual void Move(glm::vec3 amt)
+	{
+		Object::Move(amt);
+		PxQuat _rot = pBody->getGlobalPose().q;
+		pBody->setGlobalPose(PxTransform(FromGLMVec(pos) + colliderOffset, _rot));
+	}
+
+	virtual void Rotate(glm::quat _quat)
+	{
+		Object::Rotate(_quat);
+		PxVec3 _pos = pBody->getGlobalPose().p;
+		pBody->setGlobalPose(PxTransform(_pos, FromGLMQuat(rot)));
+	}
+
+	virtual void Scale(glm::vec3 amt)
+	{
+		Object::Scale(amt);
+	}
+};
+
+class StaticObject : public Model
+{
+protected:
+	PxRigidStatic* pBody;
+	PxShape* pShape;
+	PxMaterial* pMaterial;
+
+	void CreatePBody(MaterialProperties materialProperties)
+	{
+		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
+		pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
+		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
+		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
+		pBody->attachShape(*pShape); //attatch the shape to it
+		pScene->addActor(*pBody); //add rigid body to scene
+	}
+
+public:
+	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
+		const char* path)
+		:Model(path, pos, _rot, scale) {
+		CreatePBody(materialProperties);
+	}
+
+	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
+		Model* otherModel) : Model(*otherModel, pos, _rot, scale)
+	{
+		CreatePBody(materialProperties);
+	}
+
+	~StaticObject()
+	{
+		pScene->removeActor(*pBody); //remove from the scene
+		PX_RELEASE(pBody); //free the memory
+		PX_RELEASE(pShape);
+	}
+
+	virtual void Move(glm::vec3 amt)
+	{
+		Model::Move(amt);
+		PxQuat _rot = pBody->getGlobalPose().q;
+		pBody->setGlobalPose(PxTransform(FromGLMVec(pos), _rot));
+	}
+
+	virtual void Rotate(glm::quat _quat)
+	{
+		Model::Rotate(_quat);
+		PxVec3 _pos = pBody->getGlobalPose().p;
+		pBody->setGlobalPose(PxTransform(_pos, FromGLMQuat(rot)));
+	}
+
+	virtual void Scale(glm::vec3 amt)
+	{
+		Model::Scale(amt);
+	}
+};
+
+class AnimatedObject : public Object
 {
 protected:
 	Model** frames;
@@ -515,24 +651,23 @@ protected:
 	Animation<float>* factor;
 
 public:
-	AnimatedModel(std::vector<std::string> paths, unsigned int numPaths, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale)
+	AnimatedObject(std::vector<std::string> paths, unsigned int _numFrames, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale)
 		:Object(_pos, _rot, _scale)
 	{
-		numFrames = numPaths;
-		frames = new Model* [numFrames];
+		numFrames = _numFrames;
+		frames = new Model * [numFrames];
 		for (unsigned int i = 0; i < numFrames; i++) //loop over meshes
 		{
 			Model* frame = new Model(paths[i].c_str(), _pos, _rot, _scale); //create new model for each frame
 			frames[i] = frame;
 		}
 		float factorFrames[2] = { 0.0f, 1.0f };
-		factor = new Animation<float>(factorFrames, 2, 1.0f, AnimationLoopType::loop);
-		factor->Play(eTime);
+		factor = new Animation<float>(factorFrames, 2, 0.3f);
 	}
 
-	void Draw(Shader* shader, unsigned long long eTime)
+	void Draw(Shader* shader)
 	{
-		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor->GetFrame(eTime));
+		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor->GetFrame());
 		for (unsigned int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
 		{
 			glBindVertexArray(frames[currentFrame]->GetMeshes()[i]->GetGLObject()->GetObject());
@@ -614,145 +749,161 @@ public:
 	}
 };
 
-class PhysicsObject: public Model
+class AnimatedPhysicsObject : public PhysicsObject
 {
 protected:
-	PxRigidDynamic* pBody;
-	PxMaterial* pMaterial;
-
-	void CreatePBody(MaterialProperties materialProperties)
-	{
-		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
-		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
-		pBody = pPhysics->createRigidDynamic(transform); //create the dynamic rigidbody
-		pBody->attachShape(*pShape); //attatch the shape to it
-		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
-		pBody->setAngularDamping(0.10f);
-		pScene->addActor(*pBody); //add rigid body to scene
-		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
-	}
+	Model** frames;
+	unsigned int currentFrame = 0;
+	unsigned int nextFrame = 0;
+	float startTime = 0.00f;
+	unsigned int numFrames;
+	Animation<float>* factor;
 
 public:
-	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		const char* path)
-	:Model(path, pos, _rot, scale) {
-		CreatePBody(materialProperties);
+	AnimatedPhysicsObject(std::vector<std::string> paths, unsigned int _numFrames, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale, BoxCollider collider)
+		:PhysicsObject(_pos, _rot, _scale, collider, MaterialProperties{ 0.50f, 0.40f, 0.30f })
+	{
+		numFrames = _numFrames;
+		frames = new Model* [numFrames];
+		for (unsigned int i = 0; i < numFrames; i++) //loop over meshes
+		{
+			frames[i] = new Model(paths[i].c_str(), _pos, _rot, _scale); //create new model for each frame
+		}
+		float factorFrames[2] = { 0.0f, 1.0f };
+		factor = new Animation<float>(factorFrames, 2, 0.3f);
 	}
 
-	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		Model* otherModel) : Model(*otherModel, pos, _rot, scale)
+	void Draw(Shader* shader)
 	{
-		CreatePBody(materialProperties);
+		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor->GetFrame());
+		for (unsigned int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
+		{
+			glBindVertexArray(frames[currentFrame]->GetMeshes()[i]->GetGLObject()->GetObject());
+			frames[currentFrame]->GetMeshes()[i]->GetGLObject()->SetupAttributes(2, frames[nextFrame]->GetMeshes()[i]->GetGLObject()->GetAttribBuffer()->GetBuffer());
+			frames[currentFrame]->GetMeshes()[i]->Draw();
+		}
 	}
 
-	~PhysicsObject()
+	void SetNextFrame(unsigned int val)
 	{
-		pScene->removeActor(*pBody); //remove from the scene
-		PX_RELEASE(pBody); //free the memory
+		nextFrame = val;
+	}
+
+	void SetCurrentFrame(unsigned int val)
+	{
+		currentFrame = val;
+	}
+
+	void Start()
+	{
+		factor->Start();
+	}
+
+	void Stop()
+	{
+		factor->Stop();
 	}
 
 	void Update()
 	{
-		PxTransform transform = pBody->getGlobalPose(); //get the current "pose"
-		Model::SetPosition(FromPxVec(transform.p)); //update the model position
-		Model::SetRotation(glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z)); //apply new rotation
+		PhysicsObject::Update();
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->SetPosition(pos);
+				frames[i]->SetRotation(rot);
+			}
+		}
 	}
 
 	virtual void Move(glm::vec3 amt)
 	{
-		Model::Move(amt);
-		PxQuat _rot = pBody->getGlobalPose().q;
-		pBody->setGlobalPose(PxTransform(FromGLMVec(pos), _rot));
-	}
-
-	virtual void Rotate(glm::quat _quat)
-	{
-		Model::Rotate(_quat);
-		PxVec3 _pos = pBody->getGlobalPose().p;
-		pBody->setGlobalPose(PxTransform(_pos, FromGLMQuat(rot)));
-	}
-
-	virtual void Scale(glm::vec3 amt)
-	{
-		Model::Scale(amt);
-	}
-};
-
-class StaticObject : public Model
-{
-protected:
-	PxRigidStatic* pBody;
-	PxShape* pShape;
-	PxMaterial* pMaterial;
-
-	void CreatePBody(MaterialProperties materialProperties)
-	{
-		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
-		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
-		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
-		pBody->attachShape(*pShape); //attatch the shape to it
-		pScene->addActor(*pBody); //add rigid body to scene
-	}
-
-public:
-	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		const char* path)
-		:Model(path, pos, _rot, scale) {
-		CreatePBody(materialProperties);
-	}
-
-	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		Model* otherModel) : Model(*otherModel, pos, _rot, scale)
-	{
-		CreatePBody(materialProperties);
-	}
-
-	~StaticObject()
-	{
-		pScene->removeActor(*pBody); //remove from the scene
-		PX_RELEASE(pBody); //free the memory
-		PX_RELEASE(pShape);
-	}
-
-	virtual void Move(glm::vec3 amt)
-	{
-		Model::Move(amt);
-		PxQuat _rot = pBody->getGlobalPose().q;
-		pBody->setGlobalPose(PxTransform(FromGLMVec(pos), _rot));
-	}
-
-	virtual void Rotate(glm::quat _quat)
-	{
-		Model::Rotate(_quat);
-		PxVec3 _pos = pBody->getGlobalPose().p;
-		pBody->setGlobalPose(PxTransform(_pos, FromGLMQuat(rot)));
+		PhysicsObject::Move(amt);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->Move(amt);
+			}
+		}
 	}
 
 	virtual void Scale(glm::vec3 amt)
 	{
-		Model::Scale(amt);
+		PhysicsObject::Scale(amt);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->Scale(amt);
+			}
+		}
+	}
+
+	virtual void Rotate(glm::quat _quat)
+	{
+		PhysicsObject::Rotate(_quat);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->Rotate(_quat);
+			}
+		}
+	}
+
+	virtual void SetPosition(glm::vec3 val)
+	{
+		PhysicsObject::SetPosition(val);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->SetPosition(val);
+			}
+		}
+	}
+
+	virtual void SetRotation(glm::quat val)
+	{
+		PhysicsObject::SetRotation(val);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->SetRotation(val);
+			}
+		}
+	}
+
+	virtual void SetScale(glm::vec3 val)
+	{
+		PhysicsObject::SetScale(val);
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			if (frames[i] != nullptr)
+			{
+				frames[i]->SetScale(val);
+			}
+		}
 	}
 };
 
-class Player : public PhysicsObject
+class Player : public AnimatedPhysicsObject
 {
 protected:
 	glm::vec2 moveDir = glm::vec2(0.00f);
+	glm::vec2 oldMoveDir = glm::vec2(0.00f);
 	float moveSpeed = 6.67f; //max movement speed
 	float moveTime = 0.50f; //time to get to moveSpeed
 	float jumpForce = 6.00f;
 	bool shouldJump = false;
 
 public:
-	Player(glm::vec3 _pos, glm::quat _rot, Model* model)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f}, model)
-	{
-		pBody->setRigidDynamicLockFlags(PxRigidDynamicLockFlag::eLOCK_ANGULAR_X | PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z);
-	}
-	Player(glm::vec3 _pos, glm::quat _rot, const char* path)
-		:PhysicsObject(_pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f), MaterialProperties{ 0.50f, 0.40f, 0.30f }, path)
+	Player(glm::vec3 _pos, glm::quat _rot)
+		:AnimatedPhysicsObject(playerFrames, 2, _pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f),
+			BoxCollider{ PxVec3(0.00f, 0.50f, 0.00f), PxVec3(0.80f, 1.00f, 0.80f) })
 	{
 		pBody->setRigidDynamicLockFlags(PxRigidDynamicLockFlag::eLOCK_ANGULAR_X | PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z);
 	}
@@ -769,7 +920,7 @@ public:
 
 	void Update(float stepTime)
 	{
-		PhysicsObject::Update();
+		AnimatedPhysicsObject::Update();
 		//move
 		glm::vec3 worldV = glm::rotate(glm::quat(0.00f, 0.00f, 0.00f, 1.00f), -mainCamera->GetAngle() + PI, glm::vec3(0.00f, 1.00f, 0.00f))
 			* glm::vec3(moveDir.x, 0.00f, moveDir.y); //get the move direction relative to the camera's forward direction
@@ -804,6 +955,20 @@ public:
 		, PxForceMode::eIMPULSE);
 			shouldJump = false;
 		}
+
+		if (glm::length(moveDir) > 0 && glm::length(oldMoveDir) == 0) //if moving this frame and not moving last frame (first frame we are moving)
+		{
+			currentFrame = 0; //set current frame to idle
+			nextFrame = 1; //set next frame to moving
+			factor->Start(); //start blending between frames
+		}
+		if (glm::length(moveDir) == 0 && glm::length(oldMoveDir) > 0) //if not moving, but was last frame (first frame we stop)
+		{
+			currentFrame = 1; //set current frame to idle
+			nextFrame = 0; //set next frame to moving
+			factor->Start(); //start blending between frames
+		}
+		oldMoveDir = moveDir;
 	}
 };
 
@@ -1037,9 +1202,6 @@ void TogglePlatforms()
 void LoadLevelTest()
 {
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
-	PhysicsObject* pObject = new PhysicsObject(glm::vec3(2.00f, 0.50f, 1.00f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f), MaterialProperties {0.50f, 0.40f, 1.00f}, copyModel);
-	pObjects.push_back(pObject);
-	drawModels.push_back(pObject);
 	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(12.60f, 1.00f, 12.50f), copyModel);
 	Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
 	APlatforms.push_back(platform);

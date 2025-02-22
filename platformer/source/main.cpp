@@ -11,7 +11,7 @@ Shader* animatedShadowShader;
 Shader* animatedOutlineBufferShader;
 File* testFile;
 Model* testModel;
-AnimatedModel* animModel;
+AnimatedObject* animModel;
 
 Sun* sun;
 
@@ -25,13 +25,9 @@ int main(int argc, char** argv)
 	paths.push_back(Path("models/cube.obj"));
 	paths.push_back(Path("models/cube1.obj"));
 
-	animModel = new AnimatedModel(paths, 2, glm::vec3(0.00f, 1.50f, 0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.00f));
-	float frames[2] = { 0.0f, 1.0f };
-	Animation<float> fAnim = Animation(frames, 2, 5.00f, AnimationLoopType::clamp);
+	animModel = new AnimatedObject(paths, 2, glm::vec3(0.00f, 1.50f, 0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.00f));
 
 	eTime = SDL_GetTicks();
-
-	fAnim.Start(eTime);
 
 	while (running)
 	{
@@ -49,8 +45,6 @@ int main(int argc, char** argv)
 
 		mainCamera->Follow(player->GetPosition());
 		Draw();
-
-		std::cout << fAnim.GetFrame(eTime) << "\n";
 	}
 	return quit(0);
 }
@@ -134,7 +128,7 @@ int init()
 
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
-	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)), Path("models/robot_idle.obj"));
+	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)));
 	sun = new Sun(glm::vec3(-5.00f, 4.00f, -1.00f));
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
@@ -145,39 +139,47 @@ int init()
 
 void Draw()
 {
+	Shader* shader;
 	depthBuffer->Use();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
-	outlineBufferShader->Use();
-	outlineBufferShader->SetUniforms();
-	player->Draw();
+	shader = outlineBufferShader;
+	shader->Use();
+	shader->SetUniforms();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	groundPlane->Draw();
-	animatedOutlineBufferShader->Use();
-	animatedOutlineBufferShader->SetUniforms();
-	animModel->Draw(animatedOutlineBufferShader, eTime);
+	shader = animatedOutlineBufferShader;
+	shader->Use();
+	shader->SetUniforms();
+	player->Draw(shader);
+	animModel->Draw(shader);
 
 	glEnable(GL_MULTISAMPLE);
-	sun->StartShadowPass(shadowShader);
-	player->Draw();
+	shader = shadowShader;
+	sun->StartShadowPass(shader);
 	groundPlane->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
-	animatedShadowShader->Use();
-	animatedShadowShader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
-	animModel->Draw(animatedShadowShader, eTime);
+	shader = animatedShadowShader;
+	shader->Use();
+	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
+	player->Draw(shader);
+	animModel->Draw(shader);
 	sun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
-	outlineShader->Use();
-	outlineShader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
+	shader = outlineShader;
+	shader->Use();
+	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	groundPlane->Draw();
 	if (player != nullptr)
-		player->Draw();
+
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 
-	animatedOutlineShader->Use();
-	animatedOutlineShader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
-	animModel->Draw(animatedOutlineShader, eTime);
+	shader = animatedOutlineShader;
+	shader->Use();
+	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
+	player->Draw(shader);
+	animModel->Draw(shader);
 	PrintGLErrors();
 
 	SDL_GL_SwapWindow(window);
