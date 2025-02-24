@@ -189,7 +189,7 @@ protected:
 	glm::vec3 parentScale;
 
 public:
-	Mesh(aiMesh* mesh, aiMatrix4x4 globalTransform)
+	Mesh(aiMesh* mesh, aiMaterial* material, aiMatrix4x4 globalTransform)
 	{
 		glm::mat4 transform = FromAssimpMat(globalTransform);//get global transform
 		aiVector3f globalPos;
@@ -224,6 +224,12 @@ public:
 					std::cout << "Error: Failed to create mesh indices!: Face not a triangle! \n";
 					return; //fail not a triangle
 				}
+			}
+			if (material != nullptr) //if we have a material
+			{
+				aiColor3D diffuseCol;
+				material->Get(AI_MATKEY_COLOR_DIFFUSE, diffuseCol); //get the diffuse color from the material
+				color = glm::vec3(diffuseCol.r, diffuseCol.g, diffuseCol.b); //set the shader baseColor to diffuse color
 			}
 			//init the DrawableObject
 			DrawableObject::InitializeRenderObject(vertices, numVerts * sizeof(Vertex), faces, numFaces * 3 * sizeof(unsigned int));
@@ -247,7 +253,7 @@ public:
 		}
 	}
 
-	Mesh(aiMesh* mesh, aiMatrix4x4 globalTransform, int attributeOffset)
+	Mesh(aiMesh* mesh, aiMaterial* material, aiMatrix4x4 globalTransform, int attributeOffset)
 	{
 		glm::mat4 transform = FromAssimpMat(globalTransform);//get global transform
 		aiVector3f globalPos;
@@ -282,6 +288,12 @@ public:
 					std::cout << "Error: Failed to create mesh indices!: Face not a triangle! \n";
 					return; //fail not a triangle
 				}
+			}
+			if (material != nullptr) //if we have a material
+			{
+				aiColor3D diffuseCol;
+				material->Get(AI_MATKEY_COLOR_DIFFUSE, diffuseCol); //get the diffuse color from the material
+				color = glm::vec3(diffuseCol.r, diffuseCol.g, diffuseCol.b); //set the shader baseColor to diffuse color
 			}
 			//init the DrawableObject
 			DrawableObject::InitializeRenderObject(vertices, numVerts * sizeof(Vertex), faces, numFaces * 3 * sizeof(unsigned int), attributeOffset);
@@ -415,8 +427,8 @@ public:
 		//process node
 		for (unsigned int meshNum = 0; meshNum < node->mNumMeshes; meshNum++) //loop over meshes on node
 		{
-			if (meshes[node->mMeshes[meshNum]] != nullptr) //if we didn't already load this mesh
-				meshes[node->mMeshes[meshNum]] = new Mesh(scene->mMeshes[node->mMeshes[meshNum]], transform); //create a Mesh from the aiMesh and store it
+			if (meshes[node->mMeshes[meshNum]] != nullptr && scene->mMaterials != nullptr) //if we didn't already load this mesh
+				meshes[node->mMeshes[meshNum]] = new Mesh(scene->mMeshes[node->mMeshes[meshNum]], scene->mMaterials[scene->mMeshes[node->mMeshes[meshNum]]->mMaterialIndex], transform); //create a Mesh from the aiMesh and store it
 		}
 
 		//traverse children
@@ -1101,7 +1113,7 @@ protected:
 	{
 		target = _target;
 		copyModel = new Model(*copyModel, glm::vec3(0.00f), glm::quat(1.00f, 0.00f, 0.00f, 0.00f), glm::vec3(1.00f));
-		copyModel->SetColor(glm::vec3(0.90f));
+		//copyModel->SetColor(glm::vec3(0.90f));
 		particles = new DustParticle* [maxParticles];
 		for (unsigned int i = 0; i < maxParticles; i++) //init array
 		{
@@ -1366,11 +1378,14 @@ void LoadLevelTest()
 {
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(12.60f, 1.00f, 12.50f), copyModel);
+	groundPlane->SetColor(glm::vec3(243.0f / 255.0f, 223.0f / 255.0f, 162.0f / 255.0f));
 	Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
+	platform->SetColor(glm::vec3(243.0f/255.0f, 223.0f/255.0f, 162.0f/255.0f));
 	APlatforms.push_back(platform);
 	drawModels.push_back(platform);
 	platform = new Platform(glm::vec3(-1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
 	platform->Disable();
+	platform->SetColor(glm::vec3(243.0f / 255.0f, 223.0f / 255.0f, 162.0f / 255.0f));
 	BPlatforms.push_back(platform);
 	drawModels.push_back(platform);
 	delete copyModel;
