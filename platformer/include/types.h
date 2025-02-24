@@ -806,6 +806,11 @@ public:
 		currentFrame = val;
 	}
 
+	Model* GetCurrentFrame()
+	{
+		return frames[currentFrame];
+	}
+
 	void Start()
 	{
 		factor->Start();
@@ -982,6 +987,11 @@ public:
 		}
 		oldMoveDir = moveDir;
 	}
+
+	PxRigidDynamic* GetPBody()
+	{
+		return pBody;
+	}
 };
 
 class Platform
@@ -1016,6 +1026,125 @@ public:
 
 class Light : public Object
 {
+};
+
+class DustParticle: public Model
+{
+protected:
+	Animation<glm::vec3>* anim;
+	bool dead = false;
+
+public:
+	DustParticle(Model* copyModel, glm::vec3 position, glm::vec3 initalScale, glm::vec3 finalScale)
+		:Model(*copyModel, position, glm::quat(1.00f, 0.00f, 0.00f, 0.00f), initalScale)
+	{
+		constexpr float lifeTime = 0.50f;
+		Rotate(glm::quat(glm::vec3(SDL_randf() * PI, SDL_randf() * PI, SDL_randf() * PI)));
+		glm::vec3 frames[] = { initalScale, finalScale };
+		anim = new Animation(frames, 2, lifeTime);
+		anim->Start();
+	}
+
+	~DustParticle()
+	{
+		delete anim;
+	}
+
+	void Update()
+	{
+		SetScale(anim->GetFrame());
+		if (!anim->IsPlaying()) //if anim is finished
+		{
+			dead = true;
+		}
+	}
+
+	bool Dead()
+	{
+		return dead;
+	}
+};
+
+class DustCloud: public Object
+{
+protected:
+	Player* target;
+	Model* copyModel;
+	unsigned long long lastSpawnTime = 0;
+	const float minSpawnDelay = 50; //min wait time in ms before we can spawn a new particle
+	const unsigned int maxParticles = 100; //max particle count
+	DustParticle** particles;
+	unsigned int particlePointer = 0;
+
+	public:
+	DustCloud(Player* _target, Model* _copyModel) : Object()
+	{
+		target = _target;
+		copyModel = new Model(*copyModel, glm::vec3(0.00f), glm::quat(1.00f, 0.00f, 0.00f, 0.00f), glm::vec3(1.00f));
+		particles = new DustParticle* [maxParticles];
+		for (unsigned int i = 0; i < maxParticles; i++) //init array
+		{
+			particles[i] = nullptr;
+		}
+	}
+
+	DustCloud(Player* _target, const char* path) : Object()
+	{
+		target = _target;
+		copyModel = new Model(path, glm::vec3(0.00f), glm::quat(1.00f, 0.00f, 0.00f, 0.00f), glm::vec3(1.00f));
+		particles = new DustParticle* [maxParticles];
+		for (unsigned int i = 0; i < maxParticles; i++) //init array
+		{
+			particles[i] = nullptr;
+		}
+	}
+
+	void SpawnParticle(glm::vec3 _position)
+	{
+		particlePointer = (particlePointer + 1) % maxParticles; //increment the pointer
+		delete particles[particlePointer]; //delete the old particle (should be nullptr but we delete for safety)
+		particles[particlePointer] = new DustParticle(copyModel, _position, glm::vec3(0.1f), glm::vec3(0.67f)); //create new particle
+	}
+
+	void Update()
+	{
+		for (unsigned int i = 0; i < maxParticles; i++) //loop over each particle and check if it should be deleted
+		{
+			if (particles[i] != nullptr)
+			{
+				particles[i]->Update();
+				if (particles[i]->Dead())
+				{
+					delete particles[i];
+					particles[i] = nullptr;
+				}
+			}
+		}
+
+		PxRigidDynamic* pBody = target->GetPBody();
+		glm::vec3 playerSpeed = FromPxVec(pBody->getLinearVelocity());
+		playerSpeed.y = 0.00f;
+		if (glm::length(playerSpeed) >= 4.00f * 0.80f)
+		{
+			if (eTime - lastSpawnTime >= minSpawnDelay)
+			{
+				SpawnParticle(target->LocalToWorldPoint(glm::vec3(0.33f, 0.08f, -0.33f))); //change to spawn one at each track
+				SpawnParticle(target->LocalToWorldPoint(glm::vec3(-0.33f, 0.08f, -0.33f)));
+				lastSpawnTime = eTime;
+			}
+		}
+	}
+
+	void Draw()
+	{
+		for (unsigned int i = 0; i < maxParticles; i++) //loop over each particle
+		{
+			if (particles[i] != nullptr) //if it exists
+			{
+				particles[i]->Draw(); //draw it
+			}
+		}
+	}
 };
 
 class Sun: public Light

@@ -91,6 +91,15 @@ public:
 	{
 		return scal;
 	}
+
+	glm::vec3 LocalToWorldPoint(glm::vec3 point)
+	{
+		glm::mat4 translate = glm::translate(glm::mat4(1.00f), pos);
+		glm::mat4 rotate = glm::mat4_cast(rot);
+		glm::mat4 scale = glm::scale(glm::mat4(1.00f), scal);
+		glm::vec3 val = translate * rotate * scale * glm::vec4(point, 1.00f);
+		return val;
+	}
 };
 
 class Camera
@@ -946,6 +955,11 @@ public:
 		frame = glm::floor(time / frameTime);
 		unsigned int nextFrame = (frame + 1) % numFrames;
 		return frames[frame] + (time / frameTime) * (frames[nextFrame] - frames[frame]);
+	}
+
+	bool IsPlaying()
+	{
+		return isPlaying;
 	}
 };
 

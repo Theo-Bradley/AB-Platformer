@@ -12,6 +12,7 @@ Shader* animatedOutlineBufferShader;
 File* testFile;
 Model* testModel;
 AnimatedObject* animModel;
+DustCloud* playerCloud;
 
 Sun* sun;
 
@@ -26,6 +27,7 @@ int main(int argc, char** argv)
 	paths.push_back(Path("models/cube1.obj"));
 
 	animModel = new AnimatedObject(paths, 2, glm::vec3(0.00f, 1.50f, 0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.00f));
+	playerCloud = new DustCloud(player, Path("models/ball.obj"));
 
 	eTime = SDL_GetTicks();
 
@@ -42,6 +44,7 @@ int main(int argc, char** argv)
 		std::for_each(pObjects.begin(), pObjects.end(), [&](PhysicsObject* pObject) { pObject->Update(); });
 		if (player != nullptr)
 			player->Update(fTime);
+		playerCloud->Update();
 
 		mainCamera->Follow(player->GetPosition());
 		Draw();
@@ -147,6 +150,7 @@ void Draw()
 	shader->SetUniforms();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	groundPlane->Draw();
+	playerCloud->Draw();
 	shader = animatedOutlineBufferShader;
 	shader->Use();
 	shader->SetUniforms();
@@ -158,6 +162,7 @@ void Draw()
 	sun->StartShadowPass(shader);
 	groundPlane->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
+	playerCloud->Draw();
 	shader = animatedShadowShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
@@ -171,9 +176,8 @@ void Draw()
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	groundPlane->Draw();
-	if (player != nullptr)
-
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
+	playerCloud->Draw();
 
 	shader = animatedOutlineShader;
 	shader->Use();
