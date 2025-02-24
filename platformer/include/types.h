@@ -997,10 +997,12 @@ protected:
 	float jumpForce = 6.00f;
 	bool shouldJump = false; //communicates the jump keypress from Jump to Update
 	bool grounded = false;
+	bool sprinting = false;
+	bool oldSprinting = false;
 
 public:
 	Player(glm::vec3 _pos, glm::quat _rot)
-		:AnimatedPhysicsObject(playerFrames, 2, _pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f),
+		:AnimatedPhysicsObject(playerFrames, 3, _pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f),
 			BoxCollider{ PxVec3(0.00f, 0.50f, 0.00f), PxVec3(0.80f, 1.00f, 0.80f) })
 	{
 		pBody->setRigidDynamicLockFlags(PxRigidDynamicLockFlag::eLOCK_ANGULAR_X | PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z);
@@ -1019,7 +1021,8 @@ public:
 
 	void SetSprint(bool val)
 	{
-		if (val)
+		sprinting = val;
+		if (sprinting)
 			moveSpeed = 7.33f;
 		else
 			moveSpeed = 4.00f;
@@ -1072,17 +1075,41 @@ public:
 
 		if (glm::length(moveDir) > 0 && glm::length(oldMoveDir) == 0) //if moving this frame and not moving last frame (first frame we are moving)
 		{
-			currentFrame = 0; //set current frame to idle
-			nextFrame = 1; //set next frame to moving
+			if (sprinting)
+			{
+				currentFrame = 0; //set current frame to idle
+				nextFrame = 2; //set next frame to running
+			}
+			else
+			{
+				currentFrame = 0; //set current frame to idle
+				nextFrame = 1; //set next frame to walking
+			}
 			factor->Start(); //start blending between frames
+		}
+		if (glm::length(moveDir) > 0 && glm::length(oldMoveDir) > 0)
+		{
+			if (sprinting && !oldSprinting) //first frame we are sprinting while moving
+			{
+				currentFrame = 1;
+				nextFrame = 2;
+				factor->Start();
+			}
+			if (!sprinting && oldSprinting)
+			{
+				currentFrame = 2;
+				nextFrame = 1;
+				factor->Start();
+			}
 		}
 		if (glm::length(moveDir) == 0 && glm::length(oldMoveDir) > 0) //if not moving, but was last frame (first frame we stop)
 		{
-			currentFrame = 1; //set current frame to idle
-			nextFrame = 0; //set next frame to moving
+			currentFrame = nextFrame; //set current frame to whatever next frame was
+			nextFrame = 0; //set next frame idle
 			factor->Start(); //start blending between frames
 		}
 		oldMoveDir = moveDir;
+		oldSprinting = sprinting;
 	}
 
 	void SetGrounded(bool val)

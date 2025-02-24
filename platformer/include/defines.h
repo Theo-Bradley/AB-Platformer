@@ -59,7 +59,7 @@ class PhysicsObject;
 std::vector<PhysicsObject*> pObjects;
 bool platformToggle = false;
 
-std::vector<std::string> playerFrames = { Path("models/robot_idle.obj"), Path("models/robot_moving.obj") };
+std::vector<std::string> playerFrames = { Path("models/robot_idle.obj"), Path("models/robot_walking.obj"), Path("models/robot_running.obj") };
 #endif
 
 using namespace physx;

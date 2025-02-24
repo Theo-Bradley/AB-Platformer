@@ -1,4 +1,3 @@
 spot light
 fix movement wobbling when turning fast mid air (reduce turn speed?)
 Add code to change collider size on physics object if needed
-fix gap on head of claw where wrist meets forearm
