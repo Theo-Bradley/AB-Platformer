@@ -1,10 +1,4 @@
-change outline shader screenSize to be a call to textureSize
-replace current SunShadow func with shader from https://github.com/Theo-Bradley/Supermaket-Scramble/blob/master/proj/game/Assets/Shaders/s_FragmentToon.frag
-AI_SCENE_FLAGS_NON_VERBOSE_FORMAT
-directional light
-shadow stepping
 spot light
-point light
 fix movement wobbling when turning fast mid air (reduce turn speed?)
-Add code to change collider size on physics object
-Add Start Stop Play Pause to AnimatedObject and AnimatedPhysicsObject
+Add code to change collider size on physics object if needed
+add grounded code

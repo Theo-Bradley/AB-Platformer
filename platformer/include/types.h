@@ -95,7 +95,7 @@ class DrawableObject : public Object
 protected:
 	GLObject* renderObject;
 	glm::mat4 model;
-	glm::vec3 color = glm::vec3(243.0f/255.0f, 223.0f/255.0f, 162.0f/255.0f);
+	glm::vec3 color = DEFAULT_COLOR;
 
 public:
 	DrawableObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale, void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
@@ -714,6 +714,26 @@ public:
 		}
 	}
 
+	void Start()
+	{
+		factor->Start();
+	}
+
+	void Stop()
+	{
+		factor->Stop();
+	}
+
+	void Play()
+	{
+		factor->Play();
+	}
+
+	void Pause()
+	{
+		factor->Pause();
+	}
+
 	void Move(glm::vec3 amt)
 	{
 		Object::Move(amt);
@@ -851,6 +871,16 @@ public:
 	void Stop()
 	{
 		factor->Stop();
+	}
+
+	void Play()
+	{
+		factor->Play();
+	}
+
+	void Pause()
+	{
+		factor->Pause();
 	}
 
 	void Update()
@@ -1070,7 +1100,7 @@ public:
 	DustParticle(Model* copyModel, glm::vec3 position, glm::vec3 initalScale, glm::vec3 finalScale)
 		:Model(*copyModel, position, glm::quat(1.00f, 0.00f, 0.00f, 0.00f), initalScale)
 	{
-		constexpr float lifeTime = 0.50f;
+		constexpr float lifeTime = 0.67f;
 		Rotate(glm::quat(glm::vec3(SDL_randf() * PI, SDL_randf() * PI, SDL_randf() * PI)));
 		glm::vec3 frames[] = { initalScale, finalScale };
 		anim = new Animation(frames, 2, lifeTime);
@@ -1103,7 +1133,7 @@ protected:
 	Player* target;
 	Model* copyModel;
 	unsigned long long lastSpawnTime = 0;
-	const float minSpawnDelay = 50; //min wait time in ms before we can spawn a new particle
+	const float minSpawnDelay = 40; //min wait time in ms before we can spawn a new particle
 	const unsigned int maxParticles = 100; //max particle count
 	DustParticle** particles;
 	unsigned int particlePointer = 0;
@@ -1113,7 +1143,6 @@ protected:
 	{
 		target = _target;
 		copyModel = new Model(*copyModel, glm::vec3(0.00f), glm::quat(1.00f, 0.00f, 0.00f, 0.00f), glm::vec3(1.00f));
-		//copyModel->SetColor(glm::vec3(0.90f));
 		particles = new DustParticle* [maxParticles];
 		for (unsigned int i = 0; i < maxParticles; i++) //init array
 		{
@@ -1125,7 +1154,6 @@ protected:
 	{
 		target = _target;
 		copyModel = new Model(path, glm::vec3(0.00f), glm::quat(1.00f, 0.00f, 0.00f, 0.00f), glm::vec3(1.00f));
-		copyModel->SetColor(glm::vec3(0.90f));
 		particles = new DustParticle* [maxParticles];
 		for (unsigned int i = 0; i < maxParticles; i++) //init array
 		{
@@ -1137,7 +1165,7 @@ protected:
 	{
 		particlePointer = (particlePointer + 1) % maxParticles; //increment the pointer
 		delete particles[particlePointer]; //delete the old particle (should be nullptr but we delete for safety)
-		particles[particlePointer] = new DustParticle(copyModel, _position, glm::vec3(0.1f), glm::vec3(0.67f)); //create new particle
+		particles[particlePointer] = new DustParticle(copyModel, _position, glm::vec3(0.15f), glm::vec3(0.5f)); //create new particle
 	}
 
 	void Update()
@@ -1378,14 +1406,14 @@ void LoadLevelTest()
 {
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(12.60f, 1.00f, 12.50f), copyModel);
-	groundPlane->SetColor(glm::vec3(243.0f / 255.0f, 223.0f / 255.0f, 162.0f / 255.0f));
+	groundPlane->SetColor(DEFAULT_COLOR);
 	Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
-	platform->SetColor(glm::vec3(243.0f/255.0f, 223.0f/255.0f, 162.0f/255.0f));
+	platform->SetColor(DEFAULT_COLOR);
 	APlatforms.push_back(platform);
 	drawModels.push_back(platform);
 	platform = new Platform(glm::vec3(-1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
 	platform->Disable();
-	platform->SetColor(glm::vec3(243.0f / 255.0f, 223.0f / 255.0f, 162.0f / 255.0f));
+	platform->SetColor(DEFAULT_COLOR);
 	BPlatforms.push_back(platform);
 	drawModels.push_back(platform);
 	delete copyModel;

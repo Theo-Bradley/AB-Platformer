@@ -364,7 +364,7 @@ public:
 			glUniform3f(glGetUniformLocation(program, (uniformName + ".color").c_str()), 1.0f, 0.2f, 0.2f);
 			glUniform1f(glGetUniformLocation(program, (uniformName + ".constant").c_str()), 1.0f);
 			glUniform1f(glGetUniformLocation(program, (uniformName + ".linear").c_str()), 0.12f);
-			glUniform1f(glGetUniformLocation(program, (uniformName + ".quadratic").c_str()), 0.032f);
+			glUniform1f(glGetUniformLocation(program, (uniformName + ".quadratic").c_str()), 2.00f);
 		}
 		glUseProgram(oldProgram); //activate the previously active prog
 	}
@@ -843,8 +843,8 @@ protected:
 	AnimationLoopType loopType;
 	bool isPlaying = false;
 	bool isPaused = false;
-	unsigned long long startTime; //start time in MS
-	unsigned long long pauseTime; //time anim was paused in MS
+	unsigned long long startTime = 0; //start time in MS
+	unsigned long long pauseTime = 0; //time anim was paused in MS
 	float frameTime;
 	float time = 0.00f;
 

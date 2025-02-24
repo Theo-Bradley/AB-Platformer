@@ -6,6 +6,7 @@
 #endif
 
 #define PI glm::pi<float>()
+#define DEFAULT_COLOR glm::vec3(0.899f, 0.745f, 0.369f)
 
 #define Path(asset) (std::string(SDL_GetBasePath() + std::string("assets\\") + std::string(##asset##))).c_str()
 

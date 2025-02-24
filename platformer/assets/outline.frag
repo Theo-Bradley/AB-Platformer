@@ -120,10 +120,11 @@ float Outline()
 void main()
 {
 	float outline = Outline();
-	vec3 albedo = fma(outlineColor, vec3(outline), baseColor * (1.0 - outline));
+    vec3 diffuse = pow(baseColor, vec3(1.0/2.2)); //gamma correct the base color (colors from blender need correction)
+	vec3 albedo = fma(outlineColor, vec3(outline), diffuse * (1.0 - outline));
 	vec3 sunLight = fma(SunShadow(), SunDiffuse(), SunSpecular()) * sunColor; //we multiply them because they are the same light
 	//SunShadow() gets the shadow from the shadow map, and SunDiffuse() calculates our shadow using sunPos
-	vec3 globalLight = baseColor * 0.1;
+	vec3 globalLight = vec3(0.1, 0.1, 0.1);
 	vec3 pointLights = vec3(0.0, 0.0, 0.0);
 	for (int i = 0; i < NUM_LIGHTS; i++)
 	{
