@@ -95,6 +95,7 @@ class DrawableObject : public Object
 protected:
 	GLObject* renderObject;
 	glm::mat4 model;
+	glm::vec3 color = glm::vec3(243.0f/255.0f, 223.0f/255.0f, 162.0f/255.0f);
 
 public:
 	DrawableObject(glm::vec3 pos, glm::vec3 _rot, glm::vec3 scale, void* attribData, unsigned int attribSize, void* indexData, unsigned int indexSize)
@@ -120,6 +121,7 @@ public:
 	DrawableObject(const DrawableObject& other)
 	{
 		renderObject = new GLObject(*other.renderObject);
+		color = other.color;
 		pos = other.pos;
 		rot = other.rot;
 		scal = other.scal;
@@ -154,6 +156,7 @@ public:
 		unsigned int currentProgram = 0; //init
 		glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<int*>(&currentProgram)); //get currently active program
 		glUniformMatrix4fv(glGetUniformLocation(currentProgram, "model"), 1, false, glm::value_ptr(model)); //set that program's model uniform to our model mat
+		glUniform3fv(glGetUniformLocation(currentProgram, "baseColor"), 1, glm::value_ptr(color)); //set the color in the shader
 		renderObject->Draw(); //draw
 	}
 
@@ -162,12 +165,18 @@ public:
 		shader->Use(); //make sure the passed shader is active
 		model = CalculateModel(); //get the updated model matrix
 		glUniformMatrix4fv(glGetUniformLocation(shader->GetProgram(), "model"), 1, false, glm::value_ptr(model)); //update the uniform in the shader to new matrix
+		glUniform3fv(glGetUniformLocation(shader->GetProgram(), "baseColor"), 1, glm::value_ptr(color)); //set the color in the shader
 		renderObject->Draw(); //draw
 	}
 
 	GLObject* GetGLObject()
 	{
 		return renderObject;
+	}
+
+	void SetColor(glm::vec3 _color)
+	{
+		color = _color;
 	}
 };
 
@@ -435,6 +444,17 @@ public:
 			for (unsigned int i = 0; i < numMeshes; i++)
 			{
 				meshes[i]->Draw(shader);
+			}
+		}
+	}
+
+	void SetColor(glm::vec3 color)
+	{
+		if (meshes != nullptr)
+		{
+			for (unsigned int i = 0; i < numMeshes; i++)
+			{
+				meshes[i]->SetColor(color);
 			}
 		}
 	}
@@ -1081,6 +1101,7 @@ protected:
 	{
 		target = _target;
 		copyModel = new Model(*copyModel, glm::vec3(0.00f), glm::quat(1.00f, 0.00f, 0.00f, 0.00f), glm::vec3(1.00f));
+		copyModel->SetColor(glm::vec3(0.90f));
 		particles = new DustParticle* [maxParticles];
 		for (unsigned int i = 0; i < maxParticles; i++) //init array
 		{
@@ -1092,6 +1113,7 @@ protected:
 	{
 		target = _target;
 		copyModel = new Model(path, glm::vec3(0.00f), glm::quat(1.00f, 0.00f, 0.00f, 0.00f), glm::vec3(1.00f));
+		copyModel->SetColor(glm::vec3(0.90f));
 		particles = new DustParticle* [maxParticles];
 		for (unsigned int i = 0; i < maxParticles; i++) //init array
 		{

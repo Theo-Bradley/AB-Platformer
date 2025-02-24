@@ -14,6 +14,7 @@ in vec3 normal;
 in vec3 position;
 out vec4 color;
 
+uniform vec3 baseColor;
 uniform sampler2D normalMap;
 uniform sampler2D depthMap;
 uniform sampler2D shadowMap;
@@ -24,7 +25,6 @@ uniform float normThresh = 0.4;
 uniform float zNear = 0.1;
 uniform float zFar = 5.0;
 uniform vec3 outlineColor = vec3(0.05, 0.05, 0.05);
-uniform vec3 baseColor = vec3(243.0/255.0, 223.0/255.0, 162.0/255.0);
 uniform vec3 sunPos;
 uniform vec3 camDir;
 uniform vec3 camPos;

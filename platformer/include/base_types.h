@@ -143,7 +143,7 @@ public:
 	{
 		angle = _angle;
 		inclination = glm::radians(45.00f);
-		distance = 2.00f;
+		distance = 3.00f;
 		view = LookAt(_target);
 		projection = Project();
 	}
