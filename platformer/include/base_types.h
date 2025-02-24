@@ -968,3 +968,10 @@ struct BoxCollider
 	PxVec3 center;
 	PxVec3 size;
 };
+
+struct PhysicsData
+{
+	void* pointer;
+	bool isGround;
+	bool isDynamic;
+};

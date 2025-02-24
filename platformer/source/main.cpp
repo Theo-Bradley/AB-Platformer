@@ -37,6 +37,7 @@ int main(int argc, char** argv)
 		eTime = SDL_GetTicks();
 		dTime = eTime - oldETime;
 		HandleEvents();
+		player->SetGrounded(false); //before pContactCallback set player.isGrounded to false (pContactCallback will set it to true if grounded)
 		float fTime = static_cast<float>(dTime + 1) / 1000.00f; //+1 so that fTime is never 0 (crashes physx)
 		pScene->simulate(fTime); //simulate by delta time
 		pScene->fetchResults(true); //wait for results
@@ -111,8 +112,10 @@ int init()
 	sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f); //set gravity to g
 	pDispatcher = PxDefaultCpuDispatcherCreate(2); //create the default cpu task dispatcher
 	sceneDesc.cpuDispatcher = pDispatcher; //..
-	sceneDesc.filterShader = PxDefaultSimulationFilterShader; //create the default shader
+	sceneDesc.filterShader = DefaultFilterShader; //create the default shader
+	sceneDesc.simulationEventCallback = &pContactCallback;
 	pScene = pPhysics->createScene(sceneDesc); //create the scene
+	pScene->setSimulationEventCallback(&pContactCallback);
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);

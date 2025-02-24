@@ -1,4 +1,4 @@
 spot light
 fix movement wobbling when turning fast mid air (reduce turn speed?)
 Add code to change collider size on physics object if needed
-add grounded code
+add code to blend normals on animated objects

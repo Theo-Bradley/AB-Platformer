@@ -44,6 +44,9 @@ Shader* errorShader = nullptr;
 class Camera;
 Camera* mainCamera;
 
+class Player;
+Player* player;
+
 class Platform;
 std::vector<Platform*> APlatforms;
 std::vector<Platform*> BPlatforms;

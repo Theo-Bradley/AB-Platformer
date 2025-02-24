@@ -38,7 +38,6 @@ PxScene* pScene;
 PxMaterial* pMaterial;
 PxPvd* pPvd;
 GLFramebuffer* depthBuffer;
-Player* player;
 Shader* shadowShader;
 Platform* groundPlane;
 
@@ -542,10 +541,12 @@ protected:
 	PxRigidDynamic* pBody;
 	PxMaterial* pMaterial;
 	PxVec3 colliderOffset;
+	PhysicsData pData;
 
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
+		pData = PhysicsData { this, false, true };
 		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
 		colliderOffset = PxVec3(0.00f, 0.00f, 0.00f);
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
@@ -553,6 +554,7 @@ protected:
 		pBody->attachShape(*pShape); //attatch the shape to it
 		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
 		pBody->setAngularDamping(0.10f);
+		pBody->userData = &pData;
 		pScene->addActor(*pBody); //add rigid body to scene
 		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
 	}
@@ -560,6 +562,7 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties, BoxCollider collider)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
+		pData = PhysicsData{ this, false, true };
 		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(collider.size / 2.00f), *pMaterial, true); //create the associated shape
 		colliderOffset = collider.center;
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
@@ -567,6 +570,7 @@ protected:
 		pBody->attachShape(*pShape); //attatch the shape to it
 		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
 		pBody->setAngularDamping(0.10f);
+		pBody->userData = &pData;
 		pScene->addActor(*pBody); //add rigid body to scene
 		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
 	}
@@ -595,6 +599,11 @@ public:
 		Object::SetRotation(glm::quat(transform.q.w, transform.q.x, transform.q.y, transform.q.z)); //apply new rotation
 	}
 
+	PhysicsData* GetPData()
+	{
+		return &pData;
+	}
+
 	virtual void Move(glm::vec3 amt)
 	{
 		Object::Move(amt);
@@ -621,14 +630,17 @@ protected:
 	PxRigidStatic* pBody;
 	PxShape* pShape;
 	PxMaterial* pMaterial;
+	PhysicsData pData;
 
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
+		pData = PhysicsData{ this, false, false };
 		pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
 		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
 		pBody->attachShape(*pShape); //attatch the shape to it
+		pBody->userData = &pData;
 		pScene->addActor(*pBody); //add rigid body to scene
 	}
 
@@ -650,6 +662,11 @@ public:
 		pScene->removeActor(*pBody); //remove from the scene
 		PX_RELEASE(pBody); //free the memory
 		PX_RELEASE(pShape);
+	}
+
+	PhysicsData* GetPData()
+	{
+		return &pData;
 	}
 
 	virtual void Move(glm::vec3 amt)
@@ -977,7 +994,8 @@ protected:
 	float moveSpeed = 6.67f; //max movement speed
 	float moveTime = 0.50f; //time to get to moveSpeed
 	float jumpForce = 6.00f;
-	bool shouldJump = false;
+	bool shouldJump = false; //communicates the jump keypress from Jump to Update
+	bool grounded = false;
 
 public:
 	Player(glm::vec3 _pos, glm::quat _rot)
@@ -985,6 +1003,7 @@ public:
 			BoxCollider{ PxVec3(0.00f, 0.50f, 0.00f), PxVec3(0.80f, 1.00f, 0.80f) })
 	{
 		pBody->setRigidDynamicLockFlags(PxRigidDynamicLockFlag::eLOCK_ANGULAR_X | PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z);
+		pBody->setName("player");
 	}
 
 	void MoveDir(glm::vec2 dir)
@@ -1030,8 +1049,12 @@ public:
 
 		if (shouldJump)
 		{
-			pBody->addForce(PxVec3(0.00f, pBody->getMass() * jumpForce, 0.00f)
-		, PxForceMode::eIMPULSE);
+			if (grounded)
+			{
+				pBody->addForce(PxVec3(0.00f, pBody->getMass() * jumpForce, 0.00f)
+					, PxForceMode::eIMPULSE);
+				grounded = false;
+			}
 			shouldJump = false;
 		}
 
@@ -1048,6 +1071,16 @@ public:
 			factor->Start(); //start blending between frames
 		}
 		oldMoveDir = moveDir;
+	}
+
+	void SetGrounded(bool val)
+	{
+		grounded = val;
+	}
+
+	bool GetGrounded()
+	{
+		return grounded;
 	}
 
 	PxRigidDynamic* GetPBody()
@@ -1186,7 +1219,7 @@ protected:
 		PxRigidDynamic* pBody = target->GetPBody();
 		glm::vec3 playerSpeed = FromPxVec(pBody->getLinearVelocity());
 		playerSpeed.y = 0.00f;
-		if (glm::length(playerSpeed) >= 4.00f * 0.80f)
+		if (glm::length(playerSpeed) >= 4.00f * 0.80f && player->GetGrounded())
 		{
 			if (eTime - lastSpawnTime >= minSpawnDelay)
 			{
@@ -1254,6 +1287,49 @@ public:
 		glViewport(0, 0, (int)screenWidth, (int)screenHeight);
 	}
 };
+
+class ContactCallback : public PxSimulationEventCallback
+{
+public:
+	virtual void onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs) override
+	{
+		unsigned int playerIndex = 3;
+		unsigned int otherIndex = 3;
+		if (pairHeader.actors[0]->getName() == "player")
+		{
+			playerIndex = 0;
+			otherIndex = 1;
+		}
+		else
+		{
+			if (pairHeader.actors[1]->getName() == "player")
+			{
+				playerIndex = 1;
+				otherIndex = 0;
+			}
+			else
+				return;
+		}
+		if (pairHeader.actors[otherIndex]->userData != nullptr)
+		{
+			PhysicsData* otherData = static_cast<PhysicsData*>(pairHeader.actors[otherIndex]->userData);
+			if (otherData->isGround == true)
+			{
+				player->SetGrounded(true);
+			}
+		}
+	}
+
+	virtual void onConstraintBreak(PxConstraintInfo* constraints, PxU32 count) override {};
+
+	virtual void onWake(PxActor** actors, PxU32 count) override {};
+
+	virtual void onSleep(PxActor** actors, PxU32 count) override {};
+
+	virtual void onTrigger(PxTriggerPair* pairs, PxU32 count) override {};
+
+	virtual void onAdvance(const PxRigidBody* const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count) override {};
+}; ContactCallback pContactCallback;
 
 void KeyDown(SDL_KeyboardEvent key)
 {
@@ -1407,6 +1483,7 @@ void LoadLevelTest()
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(12.60f, 1.00f, 12.50f), copyModel);
 	groundPlane->SetColor(DEFAULT_COLOR);
+	groundPlane->GetPData()->isGround = true;
 	Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
 	platform->SetColor(DEFAULT_COLOR);
 	APlatforms.push_back(platform);

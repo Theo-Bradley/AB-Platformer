@@ -123,3 +123,20 @@ aiMatrix4x4 FromGLMMat(glm::mat4 _mat)
 }
 
 void TogglePlatforms();
+
+PxFilterFlags DefaultFilterShader
+(PxFilterObjectAttributes attributes0, PxFilterData filterData0,
+	PxFilterObjectAttributes attributes1, PxFilterData filterData1,
+	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
+{
+	if (PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1)) //if trigger
+	{
+		pairFlags = PxPairFlag::eTRIGGER_DEFAULT; //let physx know at least one actor in pair is a trigger
+		return PxFilterFlag::eDEFAULT; //allow collision
+	}
+
+	pairFlags = PxPairFlag::eCONTACT_DEFAULT; //let physx know to do normal collision things
+
+	pairFlags |= PxPairFlag::eNOTIFY_TOUCH_PERSISTS; //lett physx know we want to run the callback whenever the pair are touching
+	return PxFilterFlag::eDEFAULT; //allow collision
+}
