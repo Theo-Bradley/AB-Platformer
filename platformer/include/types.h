@@ -47,6 +47,7 @@ Key k_Backward = Key(key_Backward);
 Key k_Right = Key(key_Right);
 Key k_Toggle = Key(key_PlatformToggle);
 Key k_Jump = Key(key_Jump);
+Key k_Sprint = Key(key_Sprint);
 
 class GLFramebufferMS : public GLFramebuffer
 {
@@ -991,7 +992,7 @@ class Player : public AnimatedPhysicsObject
 protected:
 	glm::vec2 moveDir = glm::vec2(0.00f);
 	glm::vec2 oldMoveDir = glm::vec2(0.00f);
-	float moveSpeed = 6.67f; //max movement speed
+	float moveSpeed = 4.00f; //max movement speed
 	float moveTime = 0.50f; //time to get to moveSpeed
 	float jumpForce = 6.00f;
 	bool shouldJump = false; //communicates the jump keypress from Jump to Update
@@ -1016,19 +1017,31 @@ public:
 		shouldJump = true;
 	}
 
+	void SetSprint(bool val)
+	{
+		if (val)
+			moveSpeed = 7.33f;
+		else
+			moveSpeed = 4.00f;
+	}
+
 	void Update(float stepTime)
 	{
 		AnimatedPhysicsObject::Update();
-		//move
-		glm::vec3 worldV = glm::rotate(glm::quat(0.00f, 0.00f, 0.00f, 1.00f), -mainCamera->GetAngle() + PI, glm::vec3(0.00f, 1.00f, 0.00f))
-			* glm::vec3(moveDir.x, 0.00f, moveDir.y); //get the move direction relative to the camera's forward direction
-		glm::vec2 v = glm::vec2(worldV.x * moveSpeed, worldV.z * moveSpeed); //get target move speed
-		glm::vec3 current = FromPxVec(pBody->getLinearVelocity()); //current move speed
-		glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
-		glm::vec2 f = pBody->getMass() * (v - u) / moveTime; //calculate the force
-		//rotate
-		if (glm::length(moveDir) > 0.00f) //if we are actually moving
+		if (glm::length(moveDir) > 0.00f) //if actually want to move
 		{
+			//move
+			glm::vec2 _moveDir = glm::normalize(moveDir);
+			glm::vec3 worldV = glm::rotate(glm::quat(0.00f, 0.00f, 0.00f, 1.00f), -mainCamera->GetAngle() + PI, glm::vec3(0.00f, 1.00f, 0.00f))
+				* glm::vec3(_moveDir.x, 0.00f, _moveDir.y); //get the move direction relative to the camera's forward direction
+			glm::vec2 v = glm::vec2(worldV.x * moveSpeed, worldV.z * moveSpeed); //get target move speed
+			glm::vec3 current = FromPxVec(pBody->getLinearVelocity()); //current move speed
+			glm::vec2 u = glm::vec2(current.x, current.z); //get current move speed
+			glm::vec2 f = pBody->getMass() * (v - u) / moveTime; //calculate the force
+
+			pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply movement force
+
+			//rotate
 			glm::vec3 pForward = rot * glm::vec3(0.00f, 0.00f, 1.00f); //get local forward in global space
 			glm::vec2 playerForward = glm::normalize(glm::vec2(pForward.x, pForward.z)); //normalize without y component (removes pitch)
 			float angle = glm::orientedAngle(glm::vec3(playerForward.x, 0.00f, playerForward.y), glm::normalize(worldV), glm::vec3(0.00f, 1.00f, 0.00f)); //get angle between global forward and global move direction
@@ -1045,7 +1058,6 @@ public:
 				pBody->setAngularVelocity(PxVec3(old.x, 0.00f, old.z)); //stop rotating (this stops rotation from overshooting)
 			}
 		}
-		pBody->addForce(PxVec3(f.x, 0.00f, f.y), PxForceMode::eFORCE); //apply movement force
 
 		if (shouldJump)
 		{
@@ -1381,6 +1393,12 @@ void KeyDown(SDL_KeyboardEvent key)
 			}
 		}
 		break;
+	case(key_Sprint):
+		if (k_Sprint.Press())
+		{
+			player->SetSprint(true);
+		}
+		break;
 	}
 }
 
@@ -1421,6 +1439,12 @@ void KeyUp(SDL_KeyboardEvent key)
 		break;
 	case(key_Jump):
 		k_Jump.Release();
+		break;
+	case(key_Sprint):
+		if (k_Sprint.Release())
+		{
+			player->SetSprint(false);
+		}
 		break;
 	}
 }

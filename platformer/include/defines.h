@@ -16,6 +16,7 @@
 #define key_Right SDLK_D
 #define key_PlatformToggle SDLK_Q
 #define key_Jump SDLK_SPACE
+#define key_Sprint SDLK_LSHIFT
 
 const char* errorVert = { "#version 450 core\n"
 "layout(location = 0) in vec3 position;\n"

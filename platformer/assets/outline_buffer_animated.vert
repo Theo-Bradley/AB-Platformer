@@ -3,6 +3,7 @@
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 norm;
 layout(location = 2) in vec3 nextPosition;
+layout(location = 3) in vec3 nextNorm;
 
 out vec3 screenSpaceNormal;
 
@@ -13,5 +14,5 @@ uniform float animFac;
 void main()
 {
 	gl_Position = matrix * model * vec4(mix(position, nextPosition, animFac), 1.0);
-	screenSpaceNormal = (matrix * model * vec4(norm, 0.0)).xyz;
+	screenSpaceNormal = (matrix * model * vec4(mix(norm, nextNorm, animFac), 0.0)).xyz;
 }
