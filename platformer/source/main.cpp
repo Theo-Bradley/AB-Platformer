@@ -7,14 +7,15 @@ void Draw();
 Shader* outlineBufferShader;
 Shader* outlineShader;
 Shader* animatedOutlineShader;
+Shader* emissiveOutlineShader;
 Shader* animatedShadowShader;
 Shader* animatedOutlineBufferShader;
 File* testFile;
 Model* testModel;
 AnimatedObject* animModel;
 DustCloud* playerCloud;
-
 Sun* sun;
+StaminaBar* stamBar;
 
 int main(int argc, char** argv)
 {
@@ -29,6 +30,8 @@ int main(int argc, char** argv)
 	animModel = new AnimatedObject(paths, 2, glm::vec3(0.00f, 1.50f, 0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.00f));
 	playerCloud = new DustCloud(player, Path("models/ball.obj"));
 
+	stamBar = new StaminaBar(Path("models/stamina_bar.obj"), player);
+
 	eTime = SDL_GetTicks();
 
 	while (running)
@@ -36,7 +39,7 @@ int main(int argc, char** argv)
 		unsigned long long oldETime = eTime;
 		eTime = SDL_GetTicks();
 		dTime = eTime - oldETime;
-		HandleEvents();
+		HandleEvents(); //process inputs
 		player->SetGrounded(false); //before pContactCallback set player.isGrounded to false (pContactCallback will set it to true if grounded)
 		float fTime = static_cast<float>(dTime + 1) / 1000.00f; //+1 so that fTime is never 0 (crashes physx)
 		pScene->simulate(fTime); //simulate by delta time
@@ -44,8 +47,9 @@ int main(int argc, char** argv)
 
 		std::for_each(pObjects.begin(), pObjects.end(), [&](PhysicsObject* pObject) { pObject->Update(); });
 		if (player != nullptr)
-			player->Update(fTime);
+			player->Update();
 		playerCloud->Update();
+		stamBar->Update();
 
 		mainCamera->Follow(player->GetPosition());
 		Draw();
@@ -125,6 +129,7 @@ int init()
 	animatedShadowShader = new Shader(Path("shadow_animated.vert"), Path("basic.frag"));
 	outlineShader = new Shader(Path("outline.vert"), Path("outline.frag"));
 	animatedOutlineShader = new Shader(Path("outline_animated.vert"), Path("outline.frag"));
+	emissiveOutlineShader = new Shader(Path("outline.vert"), Path("emissive_outline.frag"));
 	outlineBufferShader = new Shader(Path("outline_buffer.vert"), Path("outline_buffer.frag"));
 	animatedOutlineBufferShader = new Shader(Path("outline_buffer_animated.vert"), Path("outline_buffer.frag"));
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
@@ -154,6 +159,7 @@ void Draw()
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	groundPlane->Draw();
 	playerCloud->Draw();
+	stamBar->Draw();
 	shader = animatedOutlineBufferShader;
 	shader->Use();
 	shader->SetUniforms();
@@ -165,6 +171,7 @@ void Draw()
 	sun->StartShadowPass(shader);
 	groundPlane->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
+	stamBar->Draw();
 	playerCloud->Draw();
 	shader = animatedShadowShader;
 	shader->Use();
@@ -181,12 +188,16 @@ void Draw()
 	groundPlane->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	playerCloud->Draw();
-
 	shader = animatedOutlineShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	player->Draw(shader);
 	animModel->Draw(shader);
+
+	shader = emissiveOutlineShader;
+	shader->Use();
+	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
+	stamBar->Draw(shader, outlineShader); //draw the staminaBar as emissive
 	PrintGLErrors();
 
 	SDL_GL_SwapWindow(window);

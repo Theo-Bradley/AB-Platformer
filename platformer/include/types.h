@@ -999,6 +999,20 @@ protected:
 	bool grounded = false;
 	bool sprinting = false;
 	bool oldSprinting = false;
+	unsigned long long int sprintStartTime = 0;
+	unsigned long long int sprintStopTime = 0;
+	unsigned long long int maxSprintTime = 2000; //max time sprinting in MS
+	long long int currentSprintTime = maxSprintTime; //current sprint stamina left in MS
+
+	void StartSprinting()
+	{
+		sprintStartTime = eTime;
+	}
+
+	void StopSprinting()
+	{
+		sprintStopTime = eTime;
+	}
 
 public:
 	Player(glm::vec3 _pos, glm::quat _rot)
@@ -1019,18 +1033,28 @@ public:
 		shouldJump = true;
 	}
 
-	void SetSprint(bool val)
-	{
-		sprinting = val;
-		if (sprinting)
-			moveSpeed = 7.33f;
-		else
-			moveSpeed = 4.00f;
-	}
-
-	void Update(float stepTime)
+	void Update()
 	{
 		AnimatedPhysicsObject::Update();
+
+		if (sprinting) //if sprinting
+		{
+			currentSprintTime -= dTime; //decrease the time left to sprint
+			if (currentSprintTime <= 0) //if stamina is depleted
+			{
+				SetSprint(false); //stop sprinting
+				StopSprinting(); //setup regen
+			}
+		}
+		else //if not sprinting
+		{
+			currentSprintTime += dTime; //increase time left to sprint
+			if (currentSprintTime >= maxSprintTime) //if stamina is over the max
+			{
+				currentSprintTime = maxSprintTime; //set it to the max
+			}
+		}
+
 		if (glm::length(moveDir) > 0.00f) //if actually want to move
 		{
 			//move
@@ -1079,6 +1103,7 @@ public:
 			{
 				currentFrame = 0; //set current frame to idle
 				nextFrame = 2; //set next frame to running
+				StartSprinting();
 			}
 			else
 			{
@@ -1094,12 +1119,14 @@ public:
 				currentFrame = 1;
 				nextFrame = 2;
 				factor->Start();
+				StartSprinting();
 			}
-			if (!sprinting && oldSprinting)
+			if (!sprinting && oldSprinting) //first frame we stop sprinting
 			{
 				currentFrame = 2;
 				nextFrame = 1;
 				factor->Start();
+				StopSprinting();
 			}
 		}
 		if (glm::length(moveDir) == 0 && glm::length(oldMoveDir) > 0) //if not moving, but was last frame (first frame we stop)
@@ -1110,6 +1137,20 @@ public:
 		}
 		oldMoveDir = moveDir;
 		oldSprinting = sprinting;
+	}
+
+	void SetSprint(bool val)
+	{
+		sprinting = val;
+		if (sprinting)
+			moveSpeed = 7.33f;
+		else
+			moveSpeed = 4.00f;
+	}
+
+	float GetStamina()
+	{
+		return ((float)currentSprintTime) / maxSprintTime;
 	}
 
 	void SetGrounded(bool val)
@@ -1369,6 +1410,48 @@ public:
 
 	virtual void onAdvance(const PxRigidBody* const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count) override {};
 }; ContactCallback pContactCallback;
+
+class StaminaBar : public Model
+{
+protected:
+	Player* target;
+	float stamina = 1.0f;
+
+public:
+	StaminaBar(const char* path, Player* _target)
+		:Model(path, glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.3f))
+	{
+		target = _target;
+	}
+
+	void Update()
+	{
+		stamina = target->GetStamina();
+		SetPosition(target->LocalToWorldPoint(glm::vec3(0.00f, 0.15f, -0.275f)));
+		SetRotation(target->GetRotation());
+		glm::vec3 col = glm::mix(glm::vec3(0.8f, 0.0f, 0.0f), glm::vec3(0.0f, 0.8f, 0.0f), stamina);
+		meshes[0]->SetColor(col);
+	}
+
+	void SetStamina(float val)
+	{
+		stamina = val;
+	}
+
+	//Use and setup the emissive shader before calling
+	void Draw(Shader* currentShader, Shader* diffuseShader) //diffuse shader should be already setup
+	{
+		meshes[0]->Draw();
+		diffuseShader->Use();
+		meshes[1]->Draw();
+		currentShader->Use();
+	}
+
+	void Draw()
+	{
+		Model::Draw();
+	}
+};
 
 void KeyDown(SDL_KeyboardEvent key)
 {
