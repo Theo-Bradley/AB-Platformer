@@ -1588,6 +1588,13 @@ void KeyDown(SDL_KeyboardEvent key)
 			player->SetSprint(true);
 		}
 		break;
+	case(key_Start):
+		if (isMainMenu)
+		{
+			UnloadMainMenu();
+			LoadLevelTest();
+		}
+		break;
 	}
 }
 
@@ -1693,6 +1700,7 @@ void TogglePlatforms()
 
 void LoadLevelTest()
 {
+	isMainMenu = false;
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(12.60f, 1.00f, 12.50f), copyModel);
 	groundPlane->SetColor(DEFAULT_COLOR);
@@ -1726,4 +1734,18 @@ void IncreaseScore(int amt)
 {
 	score += amt;
 	std::cout << score << "\n";
+}
+
+void LoadMainMenu()
+{
+	Model* plane = new Model(Path("models/plane.obj"), glm::vec3(0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f));
+	drawModels.push_back(plane);
+	isMainMenu = true;
+}
+
+void UnloadMainMenu()
+{
+	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { delete drawModel; });
+	glEnable(GL_CULL_FACE);
+	drawModels.clear();
 }

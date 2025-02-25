@@ -142,3 +142,5 @@ PxFilterFlags DefaultFilterShader
 }
 
 void IncreaseScore(int amt);
+
+void UnloadMainMenu();

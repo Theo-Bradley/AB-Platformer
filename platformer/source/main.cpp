@@ -10,6 +10,8 @@ Shader* animatedOutlineShader;
 Shader* emissiveOutlineShader;
 Shader* animatedShadowShader;
 Shader* animatedOutlineBufferShader;
+Shader* fullScreenShader;
+Texture* mainMenuTexture;
 File* testFile;
 Model* testModel;
 AnimatedObject* animModel;
@@ -22,15 +24,13 @@ int main(int argc, char** argv)
 	bool running = true;
 	init();
 
-	LoadLevelTest();
-	std::vector < std::string > paths;
+	//LoadLevelTest();
+	LoadMainMenu();
+	std::vector <std::string> paths;
 	paths.push_back(Path("models/cube.obj"));
 	paths.push_back(Path("models/cube1.obj"));
 
 	animModel = new AnimatedObject(paths, 2, glm::vec3(0.00f, 1.50f, 0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.00f));
-	playerCloud = new DustCloud(player, Path("models/ball.obj"));
-
-	stamBar = new StaminaBar(Path("models/stamina_bar.obj"), player);
 
 	eTime = SDL_GetTicks();
 
@@ -40,24 +40,35 @@ int main(int argc, char** argv)
 		eTime = SDL_GetTicks();
 		dTime = eTime - oldETime;
 		HandleEvents(); //process inputs
-		player->SetGrounded(false); //before pContactCallback set player.isGrounded to false (pContactCallback will set it to true if grounded)
-		float fTime = static_cast<float>(dTime + 1) / 1000.00f; //+1 so that fTime is never 0 (crashes physx)
-		pScene->simulate(fTime); //simulate by delta time
-		pScene->fetchResults(true); //wait for results
-
-		std::for_each(pObjects.begin(), pObjects.end(), [&](PhysicsObject* pObject) { pObject->Update(); });
-		if (player != nullptr)
-			player->Update();
-		playerCloud->Update();
-		stamBar->Update();
-		for (unsigned long long int i = 0; i < numCoins; i++)
+		if (isMainMenu)
 		{
-			if (coins[i] != nullptr)
-				coins[i]->Update();
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
+			fullScreenShader->Use();
+			drawModels[0]->Draw();
+			glDisable(GL_CULL_FACE);
+			SDL_GL_SwapWindow(window);
 		}
+		else
+		{
+			player->SetGrounded(false); //before pContactCallback set player.isGrounded to false (pContactCallback will set it to true if grounded)
+			float fTime = static_cast<float>(dTime + 1) / 1000.00f; //+1 so that fTime is never 0 (crashes physx)
+			pScene->simulate(fTime); //simulate by delta time
+			pScene->fetchResults(true); //wait for results
 
-		mainCamera->Follow(player->GetPosition());
-		Draw();
+			std::for_each(pObjects.begin(), pObjects.end(), [&](PhysicsObject* pObject) { pObject->Update(); });
+			if (player != nullptr)
+				player->Update();
+			playerCloud->Update();
+			stamBar->Update();
+			for (unsigned long long int i = 0; i < numCoins; i++)
+			{
+				if (coins[i] != nullptr)
+					coins[i]->Update();
+			}
+
+			mainCamera->Follow(player->GetPosition());
+			Draw();
+		}
 	}
 	return quit(0);
 }
@@ -137,6 +148,12 @@ int init()
 	emissiveOutlineShader = new Shader(Path("outline.vert"), Path("emissive_outline.frag"));
 	outlineBufferShader = new Shader(Path("outline_buffer.vert"), Path("outline_buffer.frag"));
 	animatedOutlineBufferShader = new Shader(Path("outline_buffer_animated.vert"), Path("outline_buffer.frag"));
+	fullScreenShader = new Shader(Path("fullscreen.vert"), Path("fullscreen.frag"));
+	fullScreenShader->Use();
+	glUniform1i(glGetUniformLocation(fullScreenShader->GetProgram(), "mainMenuTex"), 5);
+	glUniform1i(glGetUniformLocation(fullScreenShader->GetProgram(), "textAtlas"), 6);
+	mainMenuTexture = new Texture(Path("textures/main_menu.png"));
+	mainMenuTexture->Use(5);
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
 	depthBuffer->GetColor()->Use(3);
@@ -146,6 +163,8 @@ int init()
 
 	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)));
 	sun = new Sun(glm::vec3(-5.00f, 4.00f, -1.00f));
+	playerCloud = new DustCloud(player, Path("models/ball.obj"));
+	stamBar = new StaminaBar(Path("models/stamina_bar.obj"), player);
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

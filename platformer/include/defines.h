@@ -17,6 +17,7 @@
 #define key_PlatformToggle SDLK_Q
 #define key_Jump SDLK_SPACE
 #define key_Sprint SDLK_LSHIFT
+#define key_Start SDLK_RETURN
 
 const char* errorVert = { "#version 450 core\n"
 "layout(location = 0) in vec3 position;\n"
@@ -39,6 +40,7 @@ float sensitivity = 0.66f;
 unsigned long long int eTime = 0;
 unsigned long long dTime = 1;
 unsigned long long int score = 0;
+bool isMainMenu = false;
 
 class Shader;
 Shader* errorShader = nullptr;
