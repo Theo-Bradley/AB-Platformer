@@ -140,3 +140,5 @@ PxFilterFlags DefaultFilterShader
 	pairFlags |= PxPairFlag::eNOTIFY_TOUCH_PERSISTS; //lett physx know we want to run the callback whenever the pair are touching
 	return PxFilterFlag::eDEFAULT; //allow collision
 }
+
+void IncreaseScore(int amt);

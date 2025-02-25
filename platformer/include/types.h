@@ -8,6 +8,7 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "glm/gtc/quaternion.hpp"
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/vector_angle.hpp>
 #include "PhysX/PxPhysicsAPI.h"
@@ -589,6 +590,7 @@ public:
 
 	~PhysicsObject()
 	{
+		pBody->userData = nullptr;
 		pScene->removeActor(*pBody); //remove from the scene
 		PX_RELEASE(pBody); //free the memory
 	}
@@ -638,6 +640,11 @@ protected:
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
 		pData = PhysicsData{ this, false, false };
 		pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
+		if (materialProperties.isTrigger)
+		{
+			pShape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
+			pShape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true);
+		}
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
 		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
 		pBody->attachShape(*pShape); //attatch the shape to it
@@ -660,6 +667,7 @@ public:
 
 	~StaticObject()
 	{
+		pBody->userData = nullptr;
 		pScene->removeActor(*pBody); //remove from the scene
 		PX_RELEASE(pBody); //free the memory
 		PX_RELEASE(pShape);
@@ -670,7 +678,7 @@ public:
 		return &pData;
 	}
 
-	virtual void Move(glm::vec3 amt)
+	/*virtual void Move(glm::vec3 amt)
 	{
 		Model::Move(amt);
 		PxQuat _rot = pBody->getGlobalPose().q;
@@ -687,7 +695,7 @@ public:
 	virtual void Scale(glm::vec3 amt)
 	{
 		Model::Scale(amt);
-	}
+	}*/
 };
 
 class AnimatedObject : public Object
@@ -1368,49 +1376,6 @@ public:
 	}
 };
 
-class ContactCallback : public PxSimulationEventCallback
-{
-public:
-	virtual void onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs) override
-	{
-		unsigned int playerIndex = 3;
-		unsigned int otherIndex = 3;
-		if (pairHeader.actors[0]->getName() == "player")
-		{
-			playerIndex = 0;
-			otherIndex = 1;
-		}
-		else
-		{
-			if (pairHeader.actors[1]->getName() == "player")
-			{
-				playerIndex = 1;
-				otherIndex = 0;
-			}
-			else
-				return;
-		}
-		if (pairHeader.actors[otherIndex]->userData != nullptr)
-		{
-			PhysicsData* otherData = static_cast<PhysicsData*>(pairHeader.actors[otherIndex]->userData);
-			if (otherData->isGround == true)
-			{
-				player->SetGrounded(true);
-			}
-		}
-	}
-
-	virtual void onConstraintBreak(PxConstraintInfo* constraints, PxU32 count) override {};
-
-	virtual void onWake(PxActor** actors, PxU32 count) override {};
-
-	virtual void onSleep(PxActor** actors, PxU32 count) override {};
-
-	virtual void onTrigger(PxTriggerPair* pairs, PxU32 count) override {};
-
-	virtual void onAdvance(const PxRigidBody* const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count) override {};
-}; ContactCallback pContactCallback;
-
 class StaminaBar : public Model
 {
 protected:
@@ -1452,6 +1417,120 @@ public:
 		Model::Draw();
 	}
 };
+
+class Coin : public StaticObject
+{
+protected:
+	bool collected = false;
+	unsigned long long int index;
+
+public:
+	Coin(Model* copyModel, glm::vec3 _pos, unsigned long long int _index)
+		:StaticObject(_pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.20f), MaterialProperties{ 0.5f, 0.4f, 0.3f, true }, copyModel)
+	{
+		pData.isCoin = true;
+		index = _index;
+		Model::SetRotation(glm::quat(glm::vec3(glm::radians(60.00f), 0.00f, 0.00f)));
+	}
+
+	~Coin()
+	{
+		pData.pointer = nullptr;
+		coins[index] = nullptr;
+	}
+
+	void Collect()
+	{
+		collected = true;
+	}
+
+	bool IsCollected()
+	{
+		return collected;
+	}
+
+	void Update()
+	{
+		constexpr float radPerSec = PI / 2.0f; //90 deg per sec of rotation
+		if (collected)
+		{
+			delete this;
+			return;
+		}
+
+		glm::vec3 axis = glm::normalize(glm::rotateX(glm::vec3(0.0f, 1.0f, 0.0f), -glm::radians(60.00f))); //convert local y axis to world y axis
+		SetRotation(glm::rotate(rot, radPerSec * dTime/1000, axis)); //rotate about the global y
+	}
+
+	void Draw()
+	{
+		StaticObject::Draw();
+	}
+};
+
+class ContactCallback : public PxSimulationEventCallback
+{
+public:
+	virtual void onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs) override
+	{
+		unsigned int playerIndex = 3;
+		unsigned int otherIndex = 3;
+		if (pairHeader.actors[0]->getName() == "player")
+		{
+			playerIndex = 0;
+			otherIndex = 1;
+		}
+		else
+		{
+			if (pairHeader.actors[1]->getName() == "player")
+			{
+				playerIndex = 1;
+				otherIndex = 0;
+			}
+			else
+				return;
+		}
+		if (pairHeader.actors[otherIndex]->userData != nullptr)
+		{
+			PhysicsData* otherData = static_cast<PhysicsData*>(pairHeader.actors[otherIndex]->userData);
+			if (otherData->isGround == true)
+			{
+				player->SetGrounded(true);
+			}
+		}
+	}
+
+	virtual void onConstraintBreak(PxConstraintInfo* constraints, PxU32 count) override {};
+
+	virtual void onWake(PxActor** actors, PxU32 count) override {};
+
+	virtual void onSleep(PxActor** actors, PxU32 count) override {};
+
+	virtual void onTrigger(PxTriggerPair* pairs, PxU32 count) override
+	{
+		for (PxU32 i = 0; i < count; i++)
+		{
+			if (pairs[i].otherActor->getName() == "player")
+			{
+				if (pairs[i].triggerActor->userData != nullptr)
+				{
+					PhysicsData* data = static_cast<PhysicsData*>(pairs[i].triggerActor->userData);
+					if (data->pointer != nullptr && data->isCoin)
+					{
+						Coin* coin = static_cast<Coin*>(data->pointer);
+						if (!coin->IsCollected())
+						{
+							IncreaseScore(5);
+							coin->Collect();
+						}
+					}
+				}
+			}
+		}
+	}
+
+	virtual void onAdvance(const PxRigidBody* const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count) override {};
+}; ContactCallback pContactCallback;
 
 void KeyDown(SDL_KeyboardEvent key)
 {
@@ -1628,4 +1707,23 @@ void LoadLevelTest()
 	BPlatforms.push_back(platform);
 	drawModels.push_back(platform);
 	delete copyModel;
+	copyModel = new Model(Path("models/nut.obj"), glm::vec3(1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f));
+	numCoins = 1;
+	coins = new Coin* [numCoins];
+	for (unsigned long long int i = 0; i < numCoins; i++)
+		coins[i] = nullptr;
+	coins[0] = new Coin(copyModel, glm::vec3(glm::vec3(1.0f, 0.15f, 0.0f)), 0);
+}
+
+void UnloadLevelTest()
+{
+	//loop over coins
+	//delete each coin
+	//delete coins
+}
+
+void IncreaseScore(int amt)
+{
+	score += amt;
+	std::cout << score << "\n";
 }

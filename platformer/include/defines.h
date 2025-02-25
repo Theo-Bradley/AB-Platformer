@@ -38,6 +38,7 @@ float screenWidth, screenHeight;
 float sensitivity = 0.66f;
 unsigned long long int eTime = 0;
 unsigned long long dTime = 1;
+unsigned long long int score = 0;
 
 class Shader;
 Shader* errorShader = nullptr;
@@ -60,6 +61,10 @@ std::vector<PhysicsObject*> pObjects;
 bool platformToggle = false;
 
 std::vector<std::string> playerFrames = { Path("models/robot_idle.obj"), Path("models/robot_walking.obj"), Path("models/robot_running.obj") };
+
+class Coin;
+Coin** coins;
+unsigned long long int numCoins;
 #endif
 
 using namespace physx;

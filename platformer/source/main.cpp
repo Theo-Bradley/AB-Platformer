@@ -50,6 +50,11 @@ int main(int argc, char** argv)
 			player->Update();
 		playerCloud->Update();
 		stamBar->Update();
+		for (unsigned long long int i = 0; i < numCoins; i++)
+		{
+			if (coins[i] != nullptr)
+				coins[i]->Update();
+		}
 
 		mainCamera->Follow(player->GetPosition());
 		Draw();
@@ -160,6 +165,11 @@ void Draw()
 	groundPlane->Draw();
 	playerCloud->Draw();
 	stamBar->Draw();
+	for (unsigned long long int i = 0; i < numCoins; i++)
+	{
+		if (coins[i] != nullptr)
+			coins[i]->Draw();
+	}
 	shader = animatedOutlineBufferShader;
 	shader->Use();
 	shader->SetUniforms();
@@ -173,6 +183,11 @@ void Draw()
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	stamBar->Draw();
 	playerCloud->Draw();
+	for (unsigned long long int i = 0; i < numCoins; i++)
+	{
+		if (coins[i] != nullptr)
+			coins[i]->Draw();
+	}
 	shader = animatedShadowShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
@@ -188,6 +203,11 @@ void Draw()
 	groundPlane->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	playerCloud->Draw();
+	for (unsigned long long int i = 0; i < numCoins; i++)
+	{
+		if (coins[i] != nullptr)
+			coins[i]->Draw();
+	}
 	shader = animatedOutlineShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());

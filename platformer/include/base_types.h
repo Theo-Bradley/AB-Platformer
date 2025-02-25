@@ -12,6 +12,7 @@ struct MaterialProperties
 	float staticFriction;
 	float dynamicFriction;
 	float restitution;
+	bool isTrigger = false;
 };
 
 class Object
@@ -57,7 +58,37 @@ public:
 
 	virtual void Rotate(glm::quat _quat)
 	{
-		rot = rot * _quat;
+		glm::quat p = rot;
+		glm::quat q = _quat;
+		glm::quat res;
+		float a = 1.00f;
+		float b = 0;
+		res.w = p.w * q.w - p.x * q.x - p.y * q.y - p.z * q.z;
+		if (res.w < 0)
+			b = -1.00f;
+		else
+			b = 1.00f;
+		res.w = glm::modf(res.w, a) * b;
+		res.x = p.w * q.x + p.x * q.w + p.y * q.z - p.z * q.y;
+		if (res.x < 0)
+			b = -1.00f;
+		else
+			b = 1.00f;
+		res.x = glm::modf(res.x, a) * b;
+		res.y = p.w * q.y + p.y * q.w + p.z * q.x - p.x * q.z;
+		if (res.y < 0)
+			b = -1.00f;
+		else
+			b = 1.00f;
+		res.y = glm::modf(res.y, a) * b;
+		res.z = p.w * q.z + p.z * q.w + p.x * q.y - p.y * q.x;
+		if (res.z < 0)
+			b = -1.00f;
+		else
+			b = 1.00f;
+		res.z = glm::modf(res.z, a) * b;
+		rot = res;
+		std::cout << eTime << "\n";
 	}
 
 	virtual void SetPosition(glm::vec3 val)
@@ -974,4 +1005,5 @@ struct PhysicsData
 	void* pointer;
 	bool isGround;
 	bool isDynamic;
+	bool isCoin;
 };
