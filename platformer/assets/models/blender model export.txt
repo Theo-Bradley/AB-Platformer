@@ -5,3 +5,8 @@ Keep Vertex Order
 Robot:
 X forward
 scale 0.1
+
+Level_01:
+x forward
+y up
+yzx = xyz

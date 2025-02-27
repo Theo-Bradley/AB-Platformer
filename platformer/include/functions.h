@@ -6,8 +6,6 @@ void KeyUp(SDL_KeyboardEvent key);
 void MouseMoved();
 void MouseWheel(SDL_MouseWheelEvent e);
 
-void LoadLevelTest();
-
 void PrintGLErrors()
 {
 	GLenum err;
@@ -144,3 +142,7 @@ PxFilterFlags DefaultFilterShader
 void IncreaseScore(int amt);
 
 void UnloadMainMenu();
+void LoadLevel01();
+
+class PhysicsModel;
+PhysicsModel* LoadPhysicsModel(Model& copyModel, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, const char* colliderPath, glm::vec3 colliderOffset);

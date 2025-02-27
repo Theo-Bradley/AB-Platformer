@@ -1000,6 +1000,13 @@ struct BoxCollider
 	PxVec3 size;
 };
 
+struct CylinderCollider
+{
+	PxVec3 center;
+	float length;
+	float radius;
+};
+
 struct PhysicsData
 {
 	void* pointer;

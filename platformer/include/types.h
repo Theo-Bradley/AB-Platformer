@@ -356,7 +356,7 @@ protected:
 
 public:
 	Model(const Model&) = delete;
-	Model(const char* path, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale)
+	Model(const char* path, glm::vec3 _pos = glm::vec3(0.f), glm::quat _rot = glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3 _scale = glm::vec3(1.f))
 	{
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(path,
@@ -537,6 +537,30 @@ public:
 	}
 };
 
+class TriangleMesh
+{
+public:
+	PxVec3* verts;
+	unsigned int size;
+
+public:
+	//This function is has no error checking, it assumes I knew what I was doing when creating the mesh
+	TriangleMesh(const char* path)
+	{
+		Assimp::Importer importer;
+		const aiScene* scene = importer.ReadFile(path,
+			aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_GenSmoothNormals); //load scene
+		aiMesh* mesh = scene->mMeshes[0];
+		size = mesh->mNumVertices;
+		verts = new PxVec3[size];
+		for (unsigned int i = 0; i < size; i++)
+		{
+			aiVector3D vertex = mesh->mVertices[i];
+			verts[i] = PxVec3(vertex.x, vertex.y, vertex.z);
+		}
+	}
+};
+
 class PhysicsObject: public Object
 {
 protected:
@@ -577,6 +601,22 @@ protected:
 		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
 	}
 
+	void CreatePBody(MaterialProperties materialProperties, PxConvexMeshGeometry collider, glm::vec3 _colliderOffset)
+	{
+		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
+		pData = PhysicsData{ this, false, true };
+		PxShape* pShape = pPhysics->createShape(collider, *pMaterial, true); //create the associated shape
+		colliderOffset = PxVec3(_colliderOffset.x, _colliderOffset.y, _colliderOffset.z);
+		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
+		pBody = pPhysics->createRigidDynamic(transform); //create the dynamic rigidbody
+		pBody->attachShape(*pShape); //attatch the shape to it
+		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
+		pBody->setAngularDamping(0.10f);
+		pBody->userData = &pData;
+		pScene->addActor(*pBody); //add rigid body to scene
+		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
+	}
+
 public:
 	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties)
 	:Object(pos, _rot, scale) {
@@ -588,6 +628,11 @@ public:
 		CreatePBody(materialProperties, collider);
 	}
 
+	PhysicsObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, PxConvexMeshGeometry collider, glm::vec3 _colliderOffset, MaterialProperties materialProperties)
+		:Object(pos, _rot, scale) {
+		CreatePBody(materialProperties, collider, _colliderOffset);
+	}
+
 	~PhysicsObject()
 	{
 		pBody->userData = nullptr;
@@ -595,7 +640,7 @@ public:
 		PX_RELEASE(pBody); //free the memory
 	}
 
-	void Update()
+	virtual void Update()
 	{
 		PxTransform transform = pBody->getGlobalPose(); //get the current "pose"
 		Object::SetPosition(FromPxVec(transform.p - colliderOffset)); //update the model position
@@ -696,6 +741,28 @@ public:
 	{
 		Model::Scale(amt);
 	}*/
+};
+
+class PhysicsModel : public PhysicsObject, public Model
+{
+public:
+	PhysicsModel(Model& copyModel, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, MaterialProperties matProp)
+		: PhysicsObject(_pos, _rot, _scal, matProp), Model(copyModel, _pos, _rot, _scal)
+	{
+	}
+
+	PhysicsModel(Model& copyModel, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, MaterialProperties matProp, PxConvexMeshGeometry collider, glm::vec3 _colliderOffset)
+		: PhysicsObject(_pos, _rot, _scal, collider, _colliderOffset, matProp), Model(copyModel, _pos, _rot, _scal)
+	{
+		
+	}
+
+	void Update() override
+	{
+		PhysicsObject::Update();
+		Model::SetPosition(Object::pos);
+		Model::SetRotation(Object::rot);
+	}
 };
 
 class AnimatedObject : public Object
@@ -1592,7 +1659,7 @@ void KeyDown(SDL_KeyboardEvent key)
 		if (isMainMenu)
 		{
 			UnloadMainMenu();
-			LoadLevelTest();
+			LoadLevel01();
 		}
 		break;
 	}
@@ -1698,14 +1765,51 @@ void TogglePlatforms()
 	}
 }
 
-void LoadLevelTest()
+void LoadLevel01()
 {
 	isMainMenu = false;
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
-	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(12.60f, 1.00f, 12.50f), copyModel);
+	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(2.f * 10.f * 0.8f, 1.00f, 2.f * 10.f * 0.8f), copyModel);
 	groundPlane->SetColor(DEFAULT_COLOR);
 	groundPlane->GetPData()->isGround = true;
-	Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
+	const glm::vec3 levelOffset = glm::vec3(0.5f, -0.5f, -0.5f);
+	//blender position to gl posiiton (Y, Z, X)
+
+	Model* barrelModel = new Model(Path("models/mapping/barrel_container.obj"));
+	PhysicsModel* physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(0.062345f, 0.375566f, -0.277947f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(-0.403407f, 0.375566f, -0.606259f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(0.143077f, 0.375566f, -0.861213f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(-0.038688f, 1.12481f, -0.592288f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	//far side pallet stack 3 ontop of 4
+	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(3.73246f, 0.534695f, 9.49568f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(4.3871f, 0.534695f, 9.52294f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(4.36675f, 0.534695f, 8.92032f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(3.72481f, 0.534695f, 8.91513f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	/*Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
 	platform->SetColor(DEFAULT_COLOR);
 	APlatforms.push_back(platform);
 	drawModels.push_back(platform);
@@ -1714,7 +1818,9 @@ void LoadLevelTest()
 	platform->SetColor(DEFAULT_COLOR);
 	BPlatforms.push_back(platform);
 	drawModels.push_back(platform);
-	delete copyModel;
+	delete copyModel;*/
+
+	//place "coins"
 	copyModel = new Model(Path("models/nut.obj"), glm::vec3(1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f));
 	numCoins = 1;
 	coins = new Coin* [numCoins];
@@ -1723,7 +1829,7 @@ void LoadLevelTest()
 	coins[0] = new Coin(copyModel, glm::vec3(glm::vec3(1.0f, 0.15f, 0.0f)), 0);
 }
 
-void UnloadLevelTest()
+void UnloadLevel01()
 {
 	//loop over coins
 	//delete each coin
@@ -1748,4 +1854,23 @@ void UnloadMainMenu()
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { delete drawModel; });
 	glEnable(GL_CULL_FACE);
 	drawModels.clear();
+}
+
+PhysicsModel* LoadPhysicsModel(Model& copyModel, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, const char* colliderPath, glm::vec3 colliderOffset)
+{
+	TriangleMesh* colliderTris = new TriangleMesh(colliderPath);
+	PxConvexMeshDesc colliderDesc;
+	colliderDesc.points.count = colliderTris->size;
+	colliderDesc.points.stride = sizeof(PxVec3);
+	colliderDesc.points.data = colliderTris->verts;
+	colliderDesc.flags = PxConvexFlag::eCOMPUTE_CONVEX;
+
+	PxCookingParams params(pPhysics->getTolerancesScale());
+
+	PxDefaultMemoryOutputStream cookingBuffer;
+	PxConvexMeshCookingResult::Enum result;
+	PxCookConvexMesh(params, colliderDesc, cookingBuffer, &result);
+	PxDefaultMemoryInputData input(cookingBuffer.getData(), cookingBuffer.getSize());
+	PxConvexMesh* convexMesh = pPhysics->createConvexMesh(input);
+	return new PhysicsModel(copyModel, _pos, _rot, _scal, MaterialProperties {0.5f, 0.4f, 0.3f}, convexMesh, colliderOffset);
 }

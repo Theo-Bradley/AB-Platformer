@@ -18,6 +18,7 @@ AnimatedObject* animModel;
 DustCloud* playerCloud;
 Sun* sun;
 StaminaBar* stamBar;
+Model* levelTestModel;
 
 int main(int argc, char** argv)
 {
@@ -31,6 +32,7 @@ int main(int argc, char** argv)
 	paths.push_back(Path("models/cube1.obj"));
 
 	animModel = new AnimatedObject(paths, 2, glm::vec3(0.00f, 1.50f, 0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.00f));
+	levelTestModel = new Model(Path("models/level_01_static.obj"), glm::vec3(0.0f, -0.50f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f));
 
 	eTime = SDL_GetTicks();
 
@@ -161,7 +163,7 @@ int init()
 
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
-	player = new Player(glm::vec3(0.00f, 1.00f, 0.00f), glm::quat(glm::vec3(0.00f, glm::radians(12.00f), 0.00f)));
+	player = new Player(glm::vec3(0.00f, 1.00f, 1.00f), glm::quat(glm::vec3(0.00f, 0.00f, 0.00f)));
 	sun = new Sun(glm::vec3(-5.00f, 4.00f, -1.00f));
 	playerCloud = new DustCloud(player, Path("models/ball.obj"));
 	stamBar = new StaminaBar(Path("models/stamina_bar.obj"), player);
@@ -189,6 +191,7 @@ void Draw()
 		if (coins[i] != nullptr)
 			coins[i]->Draw();
 	}
+	levelTestModel->Draw();
 	shader = animatedOutlineBufferShader;
 	shader->Use();
 	shader->SetUniforms();
@@ -207,6 +210,7 @@ void Draw()
 		if (coins[i] != nullptr)
 			coins[i]->Draw();
 	}
+	levelTestModel->Draw();
 	shader = animatedShadowShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
@@ -227,6 +231,7 @@ void Draw()
 		if (coins[i] != nullptr)
 			coins[i]->Draw();
 	}
+	levelTestModel->Draw();
 	shader = animatedOutlineShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
