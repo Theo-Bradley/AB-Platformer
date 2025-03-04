@@ -165,7 +165,7 @@ protected:
 
 	glm::mat4 Project()
 	{
-		return glm::perspective(glm::radians(45.f), screenWidth / screenHeight, 0.1f, 15.00f);
+		return glm::perspective(glm::radians(45.f), screenWidth / screenHeight, 0.1f, 40.00f);
 	}
 
 public:

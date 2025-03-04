@@ -3,4 +3,6 @@ fix movement wobbling when turning fast mid air (reduce turn speed?)
 Add code to change collider size on physics object if needed
 add code to ignore player input if on main menu
 add coins
-do pistons
+add light on player to represent ab platform state
+add highscore display
+add code to respawn if the player hits a piston

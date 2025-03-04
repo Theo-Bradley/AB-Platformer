@@ -190,12 +190,14 @@ void Draw()
 		if (coins[i] != nullptr)
 			coins[i]->Draw();
 	}
+	std::for_each(pistonLights.begin(), pistonLights.end(), [&](PistonLight* pistonLight) { pistonLight->Draw(); });
 	levelTestModel->Draw();
 	shader = animatedOutlineBufferShader;
 	shader->Use();
 	shader->SetUniforms();
 	player->Draw(shader);
 	animModel->Draw(shader);
+	std::for_each(pistons.begin(), pistons.end(), [&](Piston* pistons) { pistons->Draw(shader); });
 
 	glEnable(GL_MULTISAMPLE);
 	shader = shadowShader;
@@ -208,12 +210,14 @@ void Draw()
 		if (coins[i] != nullptr)
 			coins[i]->Draw();
 	}
+	std::for_each(pistonLights.begin(), pistonLights.end(), [&](PistonLight* pistonLight) { pistonLight->Draw(); });
 	levelTestModel->Draw();
 	shader = animatedShadowShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	player->Draw(shader);
 	animModel->Draw(shader);
+	std::for_each(pistons.begin(), pistons.end(), [&](Piston* pistons) { pistons->Draw(shader); });
 	sun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -234,11 +238,13 @@ void Draw()
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	player->Draw(shader);
 	animModel->Draw(shader);
+	std::for_each(pistons.begin(), pistons.end(), [&](Piston* pistons) { pistons->Draw(shader); });
 
 	shader = emissiveOutlineShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	stamBar->Draw(shader, outlineShader); //draw the staminaBar as emissive
+	std::for_each(pistonLights.begin(), pistonLights.end(), [&](PistonLight* pistonLight) { pistonLight->Draw(shader, outlineShader); });
 	PrintGLErrors();
 
 	SDL_GL_SwapWindow(window);

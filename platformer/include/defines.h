@@ -51,12 +51,14 @@ Camera* mainCamera;
 class Player;
 Player* player;
 
-class Platform;
-std::vector<Platform*> APlatforms;
-std::vector<Platform*> BPlatforms;
+class Piston;
+std::vector<Piston*> pistons;
 
 class Model;
 std::vector<Model*> drawModels;
+
+class PistonLight;
+std::vector<PistonLight*> pistonLights;
 
 class PhysicsObject;
 std::vector<PhysicsObject*> pObjects;

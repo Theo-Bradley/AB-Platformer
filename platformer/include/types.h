@@ -397,7 +397,7 @@ public:
 		}
 	}
 
-	Model(Model& other, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scale) {
+	Model(Model& other, glm::vec3 _pos = glm::vec3(0.f), glm::quat _rot = glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3 _scale = glm::vec3(1.f)) {
 		numMeshes = other.numMeshes;
 		meshes = new Mesh* [numMeshes];
 		for (unsigned int i = 0; i < numMeshes; i++)
@@ -701,7 +701,7 @@ protected:
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
 		pData = PhysicsData{ this, false, false, false };
-		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(collider.size / 2.00f), *pMaterial, true); //create the associated shape
+		pShape = pPhysics->createShape(PxBoxGeometry(collider.size / 2.00f), *pMaterial, true); //create the associated shape
 		PxTransform transform = PxTransform(FromGLMVec(pos) + collider.center, FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
 		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
 		pBody->attachShape(*pShape); //attatch the shape to it
@@ -735,24 +735,29 @@ public:
 		return &pData;
 	}
 
-	/*virtual void Move(glm::vec3 amt)
+	PxShape* GetPShape()
 	{
-		Model::Move(amt);
+		return pShape;
+	}
+
+	virtual void SetPosition(glm::vec3 val)
+	{
+		Object::SetPosition(val);
 		PxQuat _rot = pBody->getGlobalPose().q;
 		pBody->setGlobalPose(PxTransform(FromGLMVec(pos), _rot));
 	}
 
-	virtual void Rotate(glm::quat _quat)
+	virtual void SetRotation(glm::quat val)
 	{
-		Model::Rotate(_quat);
+		Object::SetRotation(val);
 		PxVec3 _pos = pBody->getGlobalPose().p;
 		pBody->setGlobalPose(PxTransform(_pos, FromGLMQuat(rot)));
 	}
 
-	virtual void Scale(glm::vec3 amt)
+	virtual void SetScale(glm::vec3 val)
 	{
-		Model::Scale(amt);
-	}*/
+		Object::SetScale(val);
+	}
 };
 
 class PhysicsModel : public PhysicsObject, public Model
@@ -793,6 +798,11 @@ public:
 		: StaticObject(_pos, _rot, _scal, matProp), Model(copyModel, _pos, _rot, _scal)
 	{
 	}
+
+	StaticModel(Model& copyModel, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, BoxCollider collider, MaterialProperties matProp)
+		: StaticObject(_pos, _rot, _scal, collider, matProp), Model(copyModel, _pos, _rot, _scal)
+	{
+	}
 };
 
 class AnimatedObject : public Object
@@ -826,13 +836,13 @@ public:
 		delete factor;
 	}
 
-	void Draw(Shader* shader)
+	virtual void Draw(Shader* shader)
 	{
 		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor->GetFrame());
 		for (unsigned int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
 		{
 			glBindVertexArray(frames[currentFrame]->GetMeshes()[i]->GetGLObject()->GetObject());
-			frames[currentFrame]->GetMeshes()[i]->GetGLObject()->SetupAttributes(2, frames[currentFrame + 1]->GetMeshes()[i]->GetGLObject()->GetAttribBuffer()->GetBuffer());
+			frames[currentFrame]->GetMeshes()[i]->GetGLObject()->SetupAttributes(2, frames[nextFrame]->GetMeshes()[i]->GetGLObject()->GetAttribBuffer()->GetBuffer());
 			frames[currentFrame]->GetMeshes()[i]->Draw();
 		}
 	}
@@ -1089,6 +1099,75 @@ public:
 				frames[i]->SetScale(val);
 			}
 		}
+	}
+};
+
+class Piston : public AnimatedObject
+{
+protected:
+	glm::vec3 extension;
+	glm::vec3 initialPos;
+	StaticObject* trigger;
+	bool enabled;
+public:
+	Piston(StaticModel* pistonFrame, std::vector<std::string> paths, glm::quat _rot, glm::vec3 _extension, bool initalState)
+		: AnimatedObject(paths, 2, pistonFrame->Model::LocalToWorldPoint(glm::vec3(-0.164982f, 0.f, 0.f)), _rot, glm::vec3(1.f))
+	{
+		extension = _extension + glm::vec3(0.5f, 0.f, 0.f);
+		enabled = initalState;
+		initialPos = pistonFrame->Model::LocalToWorldPoint(glm::vec3(-0.164982f, 0.f, 0.f)) + glm::vec3(0.5f, 0.f, 0.f);
+		if (enabled)
+		{
+			currentFrame = 1;
+			nextFrame = 0;
+		}
+		trigger = new StaticObject(initialPos,
+			_rot, scal, MaterialProperties{ 0.5f, 0.4f, 0.3f, true });
+		glm::vec3 startPos;
+		if (enabled)
+			startPos = initialPos - extension / 2.f;
+		else
+			startPos = initialPos;
+		trigger->SetPosition(startPos);
+	}
+
+	void Draw(Shader* shader)
+	{
+		//make collider move
+		if (factor->IsPlaying())
+		{
+			glm::vec3 newPos;
+			glm::vec3 currentExtension;
+			if (enabled)
+			{
+				currentExtension = glm::mix(glm::vec3(0.f), extension / 2.f, factor->GetFrame());
+				newPos = glm::mix(initialPos + currentExtension / 2.f, initialPos - currentExtension / 2.f, factor->GetFrame());
+			}
+			else
+			{
+				currentExtension = glm::mix(extension / 2.f, glm::vec3(0.f), factor->GetFrame());
+				newPos = glm::mix(initialPos - currentExtension / 2.f, initialPos + currentExtension / 2.f, factor->GetFrame());
+			}
+			trigger->GetPShape()->setGeometry(PxBoxGeometry(FromGLMVec((scal + currentExtension) / 2.00f)));
+			trigger->SetPosition(newPos);
+		}
+		AnimatedObject::Draw(shader);
+	}
+
+	void Toggle()
+	{
+		if (enabled)
+		{
+			currentFrame = 1;
+			nextFrame = 0;
+		}
+		else
+		{
+			currentFrame = 0;
+			nextFrame = 1;
+		}
+		Start();
+		enabled = !enabled;
 	}
 };
 
@@ -1574,6 +1653,37 @@ public:
 	}
 };
 
+class PistonLight : public Model
+{
+protected:
+	bool initalState;
+
+public:
+	PistonLight(Model& copyModel, StaticModel* target, bool initalToggle)
+		:Model(copyModel)
+	{
+		initalState = initalToggle;
+		SetPosition(target->Model::LocalToWorldPoint(glm::vec3(-0.12308f, 0.436407f, 0.f)));
+		SetRotation(target->Model::GetRotation());
+	}
+
+	//Use and setup the emissive shader before calling
+	void Draw(Shader* currentShader, Shader* diffuseShader) //diffuse shader should be already setup
+	{
+		if (platformToggle != initalState) //xor
+			meshes[0]->SetColor(glm::vec3(0.f, 0.8f, 0.f));
+		else
+			meshes[0]->SetColor(glm::vec3(0.8f, 0.f, 0.f));
+		meshes[0]->Draw();
+		diffuseShader->Use();
+	}
+
+	void Draw() //used for drawing to maps
+	{
+		Model::Draw();
+	}
+};
+
 class ContactCallback : public PxSimulationEventCallback
 {
 public:
@@ -1792,14 +1902,12 @@ void TogglePlatforms()
 {
 	if (platformToggle)
 	{
-		std::for_each(APlatforms.begin(), APlatforms.end(), [&](Platform* platform) { platform->Enable(); });
-		std::for_each(BPlatforms.begin(), BPlatforms.end(), [&](Platform* platform) { platform->Disable(); });
+		std::for_each(pistons.begin(), pistons.end(), [&](Piston* piston) { piston->Toggle(); });
 		platformToggle = false;
 	}
 	else
 	{
-		std::for_each(APlatforms.begin(), APlatforms.end(), [&](Platform* platform) { platform->Disable(); });
-		std::for_each(BPlatforms.begin(), BPlatforms.end(), [&](Platform* platform) { platform->Enable(); });
+		std::for_each(pistons.begin(), pistons.end(), [&](Piston* piston) { piston->Toggle(); });
 		platformToggle = true;
 	}
 }
@@ -1962,6 +2070,54 @@ void LoadLevel01()
 	//pallet shelf
 	sceneCollider = new StaticObject(glm::vec3(-5.04544f, 0.4f, 9.24168f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(1.1f, 2.1f, 1.2f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
 	allocatedColliders.push_back(sceneCollider);
+	//load pistons
+	copyModel = new Model(Path("models/piston_frame.obj"));
+	Model* pistonLightCopyModel = new Model(Path("models/piston_light.obj"));
+	std::vector<std::string> pistonPaths = { Path("models/piston.obj"), Path("models/piston_extended.obj") };
+	StaticModel* pistonFrame = new StaticModel(*copyModel, glm::vec3(0.501424f, 0.4f, 0.803111f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.f),
+		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f)}, MaterialProperties{0.5f, 0.4f, 0.3f});
+	PistonLight* pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, false);
+	Piston* piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(180.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), false);
+	drawModels.push_back(pistonFrame);
+	allocatedColliders.push_back((StaticObject*)pistonFrame);
+	pistonLights.push_back(pistonLight);
+	drawModels.push_back(pistonFrame);
+	pistons.push_back(piston);
+	pistonFrame = new StaticModel(*copyModel, glm::vec3(-1.86611f, 0.4f, -1.90186f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(1.f),
+		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, false);
+	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), false);
+	drawModels.push_back(pistonFrame);
+	allocatedColliders.push_back((StaticObject*)pistonFrame);
+	pistonLights.push_back(pistonLight);
+	pistons.push_back(piston);
+	pistonFrame = new StaticModel(*copyModel, glm::vec3(-1.49855f, 0.4f, -7.58753f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(1.f),
+		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, false);
+	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), false);
+	drawModels.push_back(pistonFrame);
+	allocatedColliders.push_back((StaticObject*)pistonFrame);
+	pistonLights.push_back(pistonLight);
+	pistons.push_back(piston);
+	pistonFrame = new StaticModel(*copyModel, glm::vec3(1.70567f, 0.4f, -7.54987f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(1.f),
+		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, false);
+	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), false);
+	drawModels.push_back(pistonFrame);
+	allocatedColliders.push_back((StaticObject*)pistonFrame);
+	pistonLights.push_back(pistonLight);
+	pistons.push_back(piston);
+	pistonFrame = new StaticModel(*copyModel, glm::vec3(0.f, 0.4f, -4.21222f), glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(1.f),
+		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, true);
+	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), true);
+	drawModels.push_back(pistonFrame);
+	allocatedColliders.push_back((StaticObject*)pistonFrame);
+	pistonLights.push_back(pistonLight);
+	pistons.push_back(piston);
+	delete copyModel;
+	delete pistonLightCopyModel;
+	
 	/*Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
 	platform->SetColor(DEFAULT_COLOR);
 	APlatforms.push_back(platform);
