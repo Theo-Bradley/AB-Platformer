@@ -88,7 +88,6 @@ public:
 			b = 1.00f;
 		res.z = glm::modf(res.z, a) * b;
 		rot = res;
-		std::cout << eTime << "\n";
 	}
 
 	virtual void SetPosition(glm::vec3 val)

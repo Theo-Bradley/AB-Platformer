@@ -26,7 +26,7 @@ class Shader;
 class Camera;
 class GLFramebuffer;
 class Player;
-class Platform;
+class StaticModel;
 
 SDL_Window* window;
 SDL_GLContext glContext;
@@ -40,7 +40,7 @@ PxMaterial* pMaterial;
 PxPvd* pPvd;
 GLFramebuffer* depthBuffer;
 Shader* shadowShader;
-Platform* groundPlane;
+StaticModel* groundPlane;
 
 Key k_Forward = Key(key_Forward);
 Key k_Left = Key(key_Left);
@@ -572,7 +572,7 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pData = PhysicsData { this, false, true };
+		pData = PhysicsData { this, false, true, false};
 		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
 		colliderOffset = PxVec3(0.00f, 0.00f, 0.00f);
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
@@ -588,7 +588,7 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties, BoxCollider collider)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pData = PhysicsData{ this, false, true };
+		pData = PhysicsData{ this, false, true, false };
 		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(collider.size / 2.00f), *pMaterial, true); //create the associated shape
 		colliderOffset = collider.center;
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
@@ -604,7 +604,7 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties, PxConvexMeshGeometry collider, glm::vec3 _colliderOffset)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pData = PhysicsData{ this, false, true };
+		pData = PhysicsData{ this, false, true, false };
 		PxShape* pShape = pPhysics->createShape(collider, *pMaterial, true); //create the associated shape
 		colliderOffset = PxVec3(_colliderOffset.x, _colliderOffset.y, _colliderOffset.z);
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
@@ -672,7 +672,7 @@ public:
 	}
 };
 
-class StaticObject : public Model
+class StaticObject : public Object
 {
 protected:
 	PxRigidStatic* pBody;
@@ -683,7 +683,7 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pData = PhysicsData{ this, false, false };
+		pData = PhysicsData{ this, false, false, false };
 		pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
 		if (materialProperties.isTrigger)
 		{
@@ -697,17 +697,29 @@ protected:
 		pScene->addActor(*pBody); //add rigid body to scene
 	}
 
+	void CreatePBody(MaterialProperties materialProperties, BoxCollider collider)
+	{
+		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
+		pData = PhysicsData{ this, false, false, false };
+		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(collider.size / 2.00f), *pMaterial, true); //create the associated shape
+		PxTransform transform = PxTransform(FromGLMVec(pos) + collider.center, FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
+		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
+		pBody->attachShape(*pShape); //attatch the shape to it
+		pBody->userData = &pData;
+		pScene->addActor(*pBody); //add rigid body to scene
+		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
+	}
+
 public:
-	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		const char* path)
-		:Model(path, pos, _rot, scale) {
+	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties)
+		:Object(pos, _rot, scale) {
 		CreatePBody(materialProperties);
 	}
 
-	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, MaterialProperties materialProperties,
-		Model* otherModel) : Model(*otherModel, pos, _rot, scale)
+	StaticObject(glm::vec3 pos, glm::quat _rot, glm::vec3 scale, BoxCollider collider, MaterialProperties materialProperties)
+		: Object(pos, _rot, scale)
 	{
-		CreatePBody(materialProperties);
+		CreatePBody(materialProperties, collider);
 	}
 
 	~StaticObject()
@@ -751,10 +763,19 @@ public:
 	{
 	}
 
+	PhysicsModel(Model& copyModel, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, BoxCollider collider, MaterialProperties matProp)
+		: PhysicsObject(_pos, _rot, _scal, collider, matProp), Model(copyModel, _pos, _rot, _scal)
+	{
+	}
+
+	PhysicsModel(const char* path, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, BoxCollider collider, MaterialProperties matProp)
+		: PhysicsObject(_pos, _rot, _scal, collider, matProp), Model(path, _pos, _rot, _scal)
+	{
+	}
+
 	PhysicsModel(Model& copyModel, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, MaterialProperties matProp, PxConvexMeshGeometry collider, glm::vec3 _colliderOffset)
 		: PhysicsObject(_pos, _rot, _scal, collider, _colliderOffset, matProp), Model(copyModel, _pos, _rot, _scal)
 	{
-		
 	}
 
 	void Update() override
@@ -762,6 +783,15 @@ public:
 		PhysicsObject::Update();
 		Model::SetPosition(Object::pos);
 		Model::SetRotation(Object::rot);
+	}
+};
+
+class StaticModel: public StaticObject, public Model
+{
+public:
+	StaticModel(Model& copyModel, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, MaterialProperties matProp)
+		: StaticObject(_pos, _rot, _scal, matProp), Model(copyModel, _pos, _rot, _scal)
+	{
 	}
 };
 
@@ -1245,20 +1275,25 @@ public:
 };
 
 class Platform
-	: public StaticObject
+	: public StaticObject, public AnimatedObject
 {
 protected:
 	bool enabled = true;
 
 public:
-	Platform(glm::vec3 _pos, glm::vec3 _scale, Model* copyModel)
-		:StaticObject(_pos, glm::quat(1.00f, 0.00f, 0.00f, 0.00f), _scale, MaterialProperties{ 0.5f, 0.4f, 0.5f }, copyModel) {
+	Platform(glm::vec3 _pos, glm::vec3 _scale, std::vector<std::string> paths)
+		:StaticObject(_pos, glm::quat(1.00f, 0.00f, 0.00f, 0.00f), _scale, MaterialProperties{ 0.5f, 0.4f, 0.5f }),
+			AnimatedObject(paths, 2, _pos, glm::quat(1.f, 0.f, 0.f, 0.f), _scale)
+	{
 	}
 
 	void Enable()
 	{
 		if (!enabled)
 		{
+			nextFrame = 1;
+			currentFrame = 0;
+			Start();
 			pShape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, true);
 			enabled = true;
 		}
@@ -1268,6 +1303,9 @@ public:
 	{
 		if (enabled)
 		{
+			nextFrame = 0;
+			currentFrame = 1;
+			Start();
 			pShape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
 			enabled = false;
 		}
@@ -1485,7 +1523,7 @@ public:
 	}
 };
 
-class Coin : public StaticObject
+class Coin : public StaticObject, public Model
 {
 protected:
 	bool collected = false;
@@ -1493,7 +1531,8 @@ protected:
 
 public:
 	Coin(Model* copyModel, glm::vec3 _pos, unsigned long long int _index)
-		:StaticObject(_pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.20f), MaterialProperties{ 0.5f, 0.4f, 0.3f, true }, copyModel)
+		:StaticObject(_pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.20f), MaterialProperties{ 0.5f, 0.4f, 0.3f, true }),
+		Model(*copyModel, _pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.20f))
 	{
 		pData.isCoin = true;
 		index = _index;
@@ -1526,12 +1565,12 @@ public:
 		}
 
 		glm::vec3 axis = glm::normalize(glm::rotateX(glm::vec3(0.0f, 1.0f, 0.0f), -glm::radians(60.00f))); //convert local y axis to world y axis
-		SetRotation(glm::rotate(rot, radPerSec * dTime/1000, axis)); //rotate about the global y
+		Model::SetRotation(glm::rotate(Object::rot, radPerSec * dTime/1000, axis)); //rotate about the global y
 	}
 
 	void Draw()
 	{
-		StaticObject::Draw();
+		Model::Draw();
 	}
 };
 
@@ -1769,46 +1808,160 @@ void LoadLevel01()
 {
 	isMainMenu = false;
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
-	groundPlane = new Platform(glm::vec3(0.00f, -1.00f, 0.00f), glm::vec3(2.f * 10.f * 0.8f, 1.00f, 2.f * 10.f * 0.8f), copyModel);
+	groundPlane = new StaticModel(*copyModel, glm::vec3(0.00f, -0.975f, 0.00f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(2.f * 10.f, 1.00f, 2.f * 10.f),
+		MaterialProperties{ 0.5f, 0.4f, 0.3f });
 	groundPlane->SetColor(DEFAULT_COLOR);
 	groundPlane->GetPData()->isGround = true;
-	const glm::vec3 levelOffset = glm::vec3(0.5f, -0.5f, -0.5f);
+	delete copyModel;
+
+
+	const glm::vec3 barrelOffset = glm::vec3(0.5f, -0.25f, -0.5f);
 	//blender position to gl posiiton (Y, Z, X)
 
-	Model* barrelModel = new Model(Path("models/mapping/barrel_container.obj"));
-	PhysicsModel* physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(0.062345f, 0.375566f, -0.277947f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+	copyModel = new Model(Path("models/mapping/barrel_container.obj"));
+	PhysicsModel* physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(0.062345f, 0.375566f, -0.277947f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
 		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
 	drawModels.push_back(physicsObj);
 	pObjects.push_back(physicsObj);
-	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(-0.403407f, 0.375566f, -0.606259f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(-0.403407f, 0.375566f, -0.606259f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
 		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
 	drawModels.push_back(physicsObj);
 	pObjects.push_back(physicsObj);
-	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(0.143077f, 0.375566f, -0.861213f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(0.143077f, 0.375566f, -0.861213f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
 		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
 	drawModels.push_back(physicsObj);
 	pObjects.push_back(physicsObj);
-	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(-0.038688f, 1.12481f, -0.592288f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(-0.038688f, 1.12481f, -0.592288f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
 		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
 	drawModels.push_back(physicsObj);
 	pObjects.push_back(physicsObj);
 	//far side pallet stack 3 ontop of 4
-	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(3.73246f, 0.534695f, 9.49568f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(3.73246f, 0.534695f, 9.49568f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
 		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
 	drawModels.push_back(physicsObj);
 	pObjects.push_back(physicsObj);
-	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(4.3871f, 0.534695f, 9.52294f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(4.3871f, 0.534695f, 9.52294f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
 		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
 	drawModels.push_back(physicsObj);
 	pObjects.push_back(physicsObj);
-	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(4.36675f, 0.534695f, 8.92032f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(4.36675f, 0.534695f, 8.92032f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
 		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
 	drawModels.push_back(physicsObj);
 	pObjects.push_back(physicsObj);
-	physicsObj = LoadPhysicsModel(*barrelModel, glm::vec3(3.72481f, 0.534695f, 8.91513f) + levelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(3.72481f, 0.534695f, 8.91513f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
 		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
 	drawModels.push_back(physicsObj);
 	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(3.73246f, 1.43093f, 9.49568f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(4.3871f, 1.43093f, 9.52294f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(3.72481f, 1.42238f, 8.91513f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(5.35612f, 0.534695f, 9.45993f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(5.34847f, 0.526144f, 8.87939f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(6.01076f, 0.534695f, 9.4872f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = LoadPhysicsModel(*copyModel, glm::vec3(6.16564f, 0.402007f, 8.1802f) + barrelOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f),
+		Path("models/mapping/barrel_container_collider.obj"), glm::vec3(0.f));
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	delete copyModel;
+	//pallets
+	glm::vec3 palletOffset = glm::vec3(-0.1f, 0.1f, -0.1f);
+	copyModel = new Model(Path("models/mapping/pallet.obj"));
+	physicsObj = new PhysicsModel(*copyModel, glm::vec3(4.06481f, 0.102454f, 9.19628f) + palletOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.f),
+		BoxCollider{ PxVec3(0.f), PxVec3(1.40f, 0.175f, 1.44f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = new PhysicsModel(*copyModel, glm::vec3(4.06481f, 1.00839f, 9.19628f) + palletOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.f),
+		BoxCollider{ PxVec3(0.f), PxVec3(1.40f, 0.175f, 1.44f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = new PhysicsModel(*copyModel, glm::vec3(5.68277f, 0.102454f, 9.19628f) + palletOffset, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.f),
+		BoxCollider{ PxVec3(0.f), PxVec3(1.40f, 0.175f, 1.44f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = new PhysicsModel(*copyModel, glm::vec3(-0.163543f, 0.655497f, -1.44676f) + palletOffset, glm::quat(glm::vec3(glm::radians(67.808f), glm::radians(00.f), 0.f)), glm::vec3(1.f),
+		BoxCollider{ PxVec3(0.f), PxVec3(1.40f, 0.175f, 1.44f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	delete copyModel;
+	//conveyor boxes
+	copyModel = new Model(Path("models/mapping/box.obj"));
+	for (unsigned int i = 0; i < 8; i++)
+	{
+		physicsObj = new PhysicsModel(*copyModel, glm::vec3(-5.17963f, 1.8f, 2.49429f - (5.f * 0.3f * i)), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.f),
+			BoxCollider{ PxVec3(0.f), PxVec3(0.3f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+		drawModels.push_back(physicsObj);
+		pObjects.push_back(physicsObj);
+	}
+	delete copyModel;
+	//more conveyor boxes
+	physicsObj = new PhysicsModel(Path("models/mapping/box_dented.obj"), glm::vec3(-5.25463f, 0.3f, 3.22109f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.f),
+		BoxCollider{ PxVec3(0.f), PxVec3(0.3f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	physicsObj = new PhysicsModel(Path("models/mapping/box_open.obj"), glm::vec3(-5.25463f, 0.3f, 4.11169f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.f),
+		BoxCollider{ PxVec3(0.f, -0.05f, 0.f), PxVec3(0.3f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	//big open box
+	physicsObj = new PhysicsModel(Path("models/mapping/box_open.obj"), glm::vec3(9.18284f, 1.f, 9.14864f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(7.8f/2),
+		BoxCollider{ PxVec3(0.f, -0.2f, 0.f), PxVec3(0.3f * 7.8f/2) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	drawModels.push_back(physicsObj);
+	pObjects.push_back(physicsObj);
+	//static colliders
+	//conveyor belts
+	StaticObject* sceneCollider = new StaticObject(glm::vec3(6.0f, 0.1f, -1.71304f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(0.8f, 0.15f, 16.4f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	sceneCollider = new StaticObject(glm::vec3(-5.19f, 0.f, -3.29f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(0.75f, 0.15f, 12.0f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	//red containers
+	sceneCollider = new StaticObject(glm::vec3(1.65f, 1.31729f, 1.12216f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(5.6f, 3.f, 2.39f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	sceneCollider = new StaticObject(glm::vec3(1.65f, 1.31729f, 1.12216f + 5.6f + 0.25f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(5.6f, 3.f, 2.39f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	sceneCollider = new StaticObject(glm::vec3(1.65f - 2.39f - 0.2f, 1.31729f, 1.12216f + 5.6f + 0.25f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(5.6f, 3.f, 2.39f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	sceneCollider = new StaticObject(glm::vec3(1.65f - (2.39f/2) - 0.5f, 1.31729f, 1.12216f - 5.6f + (2.39f/2) + 0.22f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(5.65f, 3.f, 2.34f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	sceneCollider = new StaticObject(glm::vec3(1.65f - (2.39f / 2) - 0.5f, 1.31729f, 1.12216f - 5.6f - 5.8f + (2.39f / 2) + 0.35f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(5.65f, 3.f, 2.34f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	//big boxes
+	sceneCollider = new StaticObject(glm::vec3(-4.06237f, 0.1f, 0.791069f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.23f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	sceneCollider = new StaticObject(glm::vec3(-4.06237f + (1.23f * 1.1f), 0.1f, 0.791069f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.23f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	sceneCollider = new StaticObject(glm::vec3(-3.51954f, 0.1f + (1.23f * 1.1f), 0.791069f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.23f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	//water containers
+	sceneCollider = new StaticObject(glm::vec3(-4.13062f, 0.f, 1.98159f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.075f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	sceneCollider = new StaticObject(glm::vec3(-0.375972f, 0.25f, 3.2367f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.075f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	sceneCollider = new StaticObject(glm::vec3(7.31743f, 0.175f, 9.22745f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.0f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	//water container pallet
+	sceneCollider = new StaticObject(glm::vec3(7.26648f, 0.175f - 0.5f, 9.19628f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3 (1.40f, 0.175f, 1.44f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
+	//pallet shelf
+	sceneCollider = new StaticObject(glm::vec3(-5.04544f, 0.4f, 9.24168f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(1.1f, 2.1f, 1.2f), MaterialProperties{ 0.5f, 0.4f, 0.3f });
+	allocatedColliders.push_back(sceneCollider);
 	/*Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
 	platform->SetColor(DEFAULT_COLOR);
 	APlatforms.push_back(platform);
@@ -1827,6 +1980,7 @@ void LoadLevel01()
 	for (unsigned long long int i = 0; i < numCoins; i++)
 		coins[i] = nullptr;
 	coins[0] = new Coin(copyModel, glm::vec3(glm::vec3(1.0f, 0.15f, 0.0f)), 0);
+	eTime = SDL_GetTicks();
 }
 
 void UnloadLevel01()
@@ -1834,6 +1988,8 @@ void UnloadLevel01()
 	//loop over coins
 	//delete each coin
 	//delete coins
+	//delete all pObjects and allocatedColliders
+	//empty drawable objects
 }
 
 void IncreaseScore(int amt)

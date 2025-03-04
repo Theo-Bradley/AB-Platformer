@@ -183,7 +183,6 @@ void Draw()
 	shader->Use();
 	shader->SetUniforms();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
-	groundPlane->Draw();
 	playerCloud->Draw();
 	stamBar->Draw();
 	for (unsigned long long int i = 0; i < numCoins; i++)
@@ -201,7 +200,6 @@ void Draw()
 	glEnable(GL_MULTISAMPLE);
 	shader = shadowShader;
 	sun->StartShadowPass(shader);
-	groundPlane->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	stamBar->Draw();
 	playerCloud->Draw();
@@ -223,7 +221,6 @@ void Draw()
 	shader = outlineShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
-	groundPlane->Draw();
 	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
 	playerCloud->Draw();
 	for (unsigned long long int i = 0; i < numCoins; i++)

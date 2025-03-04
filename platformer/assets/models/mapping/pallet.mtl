@@ -1,7 +1,7 @@
-# Blender MTL File: 'None'
+# Blender MTL File: 'level_01.blend'
 # Material Count: 1
 
-newmtl Pallets_MAT
+newmtl Pallets_MAT.002
 Ns 179.999996
 Ka 1.000000 1.000000 1.000000
 Kd 0.456411 0.266356 0.149960

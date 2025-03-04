@@ -60,6 +60,8 @@ std::vector<Model*> drawModels;
 
 class PhysicsObject;
 std::vector<PhysicsObject*> pObjects;
+class Object;
+std::vector<Object*> allocatedColliders; //use this for cleanup only
 bool platformToggle = false;
 
 std::vector<std::string> playerFrames = { Path("models/robot_idle.obj"), Path("models/robot_walking.obj"), Path("models/robot_running.obj") };
