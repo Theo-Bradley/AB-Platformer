@@ -19,6 +19,7 @@
 #define key_Sprint SDLK_LSHIFT
 #define key_Start SDLK_RETURN
 
+//create the fallback shader
 const char* errorVert = { "#version 450 core\n"
 "layout(location = 0) in vec3 position;\n"
 "void main()\n"
@@ -71,6 +72,8 @@ std::vector<std::string> playerFrames = { Path("models/robot_idle.obj"), Path("m
 class Coin;
 Coin** coins;
 unsigned long long int numCoins;
+
+bool dieFlag = false;
 #endif
 
 using namespace physx;

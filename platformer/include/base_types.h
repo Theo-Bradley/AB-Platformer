@@ -578,42 +578,45 @@ protected:
 	int width, height;
 
 public:
+	//default construcotr
+	//creates a complete buffer the size of the screen
 	GLFramebuffer()
 	{
 		glGenFramebuffers(1, &framebuffer);
-		color = new Texture((int)screenWidth, (int)screenHeight, GL_RGB, GL_UNSIGNED_BYTE);
-		depth = new Texture((int)screenWidth, (int)screenHeight, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
+		color = new Texture((int)screenWidth, (int)screenHeight, GL_RGB, GL_UNSIGNED_BYTE); //create a texture for the color attachment
+		depth = new Texture((int)screenWidth, (int)screenHeight, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT); //create a depth texture
 		width = (int)screenWidth;
 		height = (int)screenHeight;
 		unsigned int oldFramebuffer = 0;
-		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer)); //get old framebuffer so we can rebind it after
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color->GetTexture(), 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color->GetTexture(), 0); //attach textures
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth->GetTexture(), 0);
 		int completeness = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-		if (completeness != GL_FRAMEBUFFER_COMPLETE)
+		if (completeness != GL_FRAMEBUFFER_COMPLETE) //check if framebuffer is complete
 		{
 			std::cout << "Framebuffer Depth Completeness: 0x" << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << "\n";
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
 	}
 
+	//create framebuffer of width and height
 	GLFramebuffer(int _width, int _height, bool multisample = false)
 	{
 		unsigned int oldFramebuffer = 0;
-		if (multisample)
+		if (multisample) //if we want to multisample create a MS buffer
 		{
 			width = _width;
 			height = _height;
 			glGenFramebuffers(1, &framebuffer);
-			color = new Texture(width, height, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE, true);
-			depth = new Texture(width, height, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, true);
-			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer));
+			color = new Texture(width, height, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE, true); //create a texture for the color attachment
+			depth = new Texture(width, height, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, true); //create a depth texture
+			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<int*>(&oldFramebuffer)); //get old framebuffer so we can rebind it after
 			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, color->GetTexture(), 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, color->GetTexture(), 0); //attach textures
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D_MULTISAMPLE, depth->GetTexture(), 0);
 			int completeness = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-			if (completeness != GL_FRAMEBUFFER_COMPLETE)
+			if (completeness != GL_FRAMEBUFFER_COMPLETE) //check if framebuffer is complete
 			{
 				std::cout << "Framebuffer Depth Completeness: 0x" << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::dec << "\n";
 			}
@@ -855,6 +858,11 @@ public:
 		}
 		return false;
 	}
+
+	void Reset()
+	{
+		pressed = false;
+	}
 };
 
 enum class AnimationLoopType
@@ -1012,4 +1020,5 @@ struct PhysicsData
 	bool isGround;
 	bool isDynamic;
 	bool isCoin;
+	bool isPiston;
 };

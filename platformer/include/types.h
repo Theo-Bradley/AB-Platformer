@@ -27,6 +27,9 @@ class Camera;
 class GLFramebuffer;
 class Player;
 class StaticModel;
+class DustCloud;
+class StaminaBar;
+class Texture;
 
 SDL_Window* window;
 SDL_GLContext glContext;
@@ -37,10 +40,13 @@ PxPhysics* pPhysics;
 PxDefaultCpuDispatcher* pDispatcher;
 PxScene* pScene;
 PxMaterial* pMaterial;
-PxPvd* pPvd;
 GLFramebuffer* depthBuffer;
 Shader* shadowShader;
 StaticModel* groundPlane;
+StaminaBar* stamBar;
+DustCloud* playerCloud;
+Texture* toggleTexture;
+Shader* toggleShader;
 
 Key k_Forward = Key(key_Forward);
 Key k_Left = Key(key_Left);
@@ -69,6 +75,7 @@ public:
 
 	void Downsample()
 	{
+		//downsample the multisampled buffer into a regular one by blitting from the MS buffer to a regular buffer
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, multisampleBuffer->GetFramebuffer());
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
 		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
@@ -192,21 +199,20 @@ protected:
 public:
 	Mesh(aiMesh* mesh, aiMaterial* material, aiMatrix4x4 globalTransform)
 	{
-		glm::mat4 transform = FromAssimpMat(globalTransform);//get global transform
 		aiVector3f globalPos;
 		aiQuaternion globalRot;
 		aiVector3f globalScale;
-		globalTransform.Decompose(globalScale, globalRot, globalPos);
+		globalTransform.Decompose(globalScale, globalRot, globalPos); //get pos rot and scal from the globalTransform
 		unsigned int numVerts = mesh->mNumVertices;
-		if (numVerts > 0)
+		if (numVerts > 0) //if it has some verts
 		{
-			Vertex* vertices = new Vertex[numVerts];
-			for (unsigned int vert = 0; vert < numVerts; vert++)
+			Vertex* vertices = new Vertex[numVerts]; //alloc
+			for (unsigned int vert = 0; vert < numVerts; vert++) //loop over each vert
 			{
 				Vertex vertex = Vertex{ FromAssimpVec(mesh->mVertices[vert]),
 					FromAssimpVec(mesh->mNormals[vert]),
-					glm::vec2(mesh->mTextureCoords[0][vert].x, mesh->mTextureCoords[0][vert].y) };
-				vertices[vert] = vertex;
+					glm::vec2(mesh->mTextureCoords[0][vert].x, mesh->mTextureCoords[0][vert].y) }; //extract and store the info in a Vertex struct
+				vertices[vert] = vertex; //store on the mesh
 			}
 			unsigned int numFaces = mesh->mNumFaces; //get number of faces
 			unsigned int* faces = new unsigned int[numFaces * 3]; //3 indices per face
@@ -256,20 +262,19 @@ public:
 
 	Mesh(aiMesh* mesh, aiMaterial* material, aiMatrix4x4 globalTransform, int attributeOffset)
 	{
-		glm::mat4 transform = FromAssimpMat(globalTransform);//get global transform
 		aiVector3f globalPos;
 		aiQuaternion globalRot;
 		aiVector3f globalScale;
 		globalTransform.Decompose(globalScale, globalRot, globalPos);
 		unsigned int numVerts = mesh->mNumVertices;
-		if (numVerts > 0)
+		if (numVerts > 0) //if has some verts
 		{
 			Vertex* vertices = new Vertex[numVerts];
-			for (unsigned int vert = 0; vert < numVerts; vert++)
+			for (unsigned int vert = 0; vert < numVerts; vert++) //loop over each vertex
 			{
 				Vertex vertex = Vertex{ FromAssimpVec(mesh->mVertices[vert]),
 					FromAssimpVec(mesh->mNormals[vert]),
-					glm::vec2(mesh->mTextureCoords[0][vert].x, mesh->mTextureCoords[0][vert].y) };
+					glm::vec2(mesh->mTextureCoords[0][vert].x, mesh->mTextureCoords[0][vert].y) }; //extract and store the info in a Vertex struct
 				vertices[vert] = vertex;
 			}
 			unsigned int numFaces = mesh->mNumFaces; //get number of faces
@@ -544,19 +549,19 @@ public:
 	unsigned int size;
 
 public:
-	//This function is has no error checking, it assumes I knew what I was doing when creating the mesh
+	//This function is has no error checking, it assumes I knew what I was doing when creating the mesh and is used for loading single mesh colliders only
 	TriangleMesh(const char* path)
 	{
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(path,
 			aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_GenSmoothNormals); //load scene
-		aiMesh* mesh = scene->mMeshes[0];
+		aiMesh* mesh = scene->mMeshes[0]; //get first mesh only
 		size = mesh->mNumVertices;
-		verts = new PxVec3[size];
-		for (unsigned int i = 0; i < size; i++)
+		verts = new PxVec3[size]; //alloc some verts
+		for (unsigned int i = 0; i < size; i++) //loop over each vert
 		{
 			aiVector3D vertex = mesh->mVertices[i];
-			verts[i] = PxVec3(vertex.x, vertex.y, vertex.z);
+			verts[i] = PxVec3(vertex.x, vertex.y, vertex.z); //convert and store the vertex position as a PxVec3
 		}
 	}
 };
@@ -572,7 +577,7 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pData = PhysicsData { this, false, true, false};
+		pData = PhysicsData { this, false, true, false, false};
 		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
 		colliderOffset = PxVec3(0.00f, 0.00f, 0.00f);
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
@@ -580,7 +585,7 @@ protected:
 		pBody->attachShape(*pShape); //attatch the shape to it
 		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
 		pBody->setAngularDamping(0.10f);
-		pBody->userData = &pData;
+		pBody->userData = &pData; //set the user data
 		pScene->addActor(*pBody); //add rigid body to scene
 		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
 	}
@@ -588,7 +593,7 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties, BoxCollider collider)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pData = PhysicsData{ this, false, true, false };
+		pData = PhysicsData{ this, false, true, false, false};
 		PxShape* pShape = pPhysics->createShape(PxBoxGeometry(collider.size / 2.00f), *pMaterial, true); //create the associated shape
 		colliderOffset = collider.center;
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
@@ -596,7 +601,7 @@ protected:
 		pBody->attachShape(*pShape); //attatch the shape to it
 		PxRigidBodyExt::updateMassAndInertia(*pBody, 10.0f); //update the mass with density and new shape
 		pBody->setAngularDamping(0.10f);
-		pBody->userData = &pData;
+		pBody->userData = &pData; //set the user data
 		pScene->addActor(*pBody); //add rigid body to scene
 		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
 	}
@@ -604,7 +609,7 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties, PxConvexMeshGeometry collider, glm::vec3 _colliderOffset)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pData = PhysicsData{ this, false, true, false };
+		pData = PhysicsData{ this, false, true, false, false};
 		PxShape* pShape = pPhysics->createShape(collider, *pMaterial, true); //create the associated shape
 		colliderOffset = PxVec3(_colliderOffset.x, _colliderOffset.y, _colliderOffset.z);
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
@@ -683,29 +688,29 @@ protected:
 	void CreatePBody(MaterialProperties materialProperties)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pData = PhysicsData{ this, false, false, false };
+		pData = PhysicsData{ this, false, false, false, false};
 		pShape = pPhysics->createShape(PxBoxGeometry(FromGLMVec(scal) / 2.00f), *pMaterial, true); //create the associated shape
 		if (materialProperties.isTrigger)
 		{
-			pShape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
-			pShape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true);
+			pShape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false); //disable classic collisions
+			pShape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true); //enable trigger collisions
 		}
 		PxTransform transform = PxTransform(FromGLMVec(pos), FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
 		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
 		pBody->attachShape(*pShape); //attatch the shape to it
-		pBody->userData = &pData;
+		pBody->userData = &pData; //set the user data
 		pScene->addActor(*pBody); //add rigid body to scene
 	}
 
 	void CreatePBody(MaterialProperties materialProperties, BoxCollider collider)
 	{
 		pMaterial = pPhysics->createMaterial(materialProperties.staticFriction, materialProperties.dynamicFriction, materialProperties.restitution); //create our physics mat
-		pData = PhysicsData{ this, false, false, false };
+		pData = PhysicsData{ this, false, false, false, false};
 		pShape = pPhysics->createShape(PxBoxGeometry(collider.size / 2.00f), *pMaterial, true); //create the associated shape
 		PxTransform transform = PxTransform(FromGLMVec(pos) + collider.center, FromGLMQuat(rot)); //create the starting transform from the class rot and xyz
 		pBody = pPhysics->createRigidStatic(transform); //create the dynamic rigidbody
 		pBody->attachShape(*pShape); //attatch the shape to it
-		pBody->userData = &pData;
+		pBody->userData = &pData; //set the user data
 		pScene->addActor(*pBody); //add rigid body to scene
 		PX_RELEASE(pShape); //the shape is now "contained" by the actor???? or maybe it schedules release and won't release now the ref count is > 0 ??
 	}
@@ -832,6 +837,10 @@ public:
 
 	~AnimatedObject()
 	{
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			delete frames[i];
+		}
 		delete[] frames;
 		delete factor;
 	}
@@ -841,6 +850,7 @@ public:
 		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor->GetFrame());
 		for (unsigned int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
 		{
+			//pass in the next frames verts so the shader can blend them
 			glBindVertexArray(frames[currentFrame]->GetMeshes()[i]->GetGLObject()->GetObject());
 			frames[currentFrame]->GetMeshes()[i]->GetGLObject()->SetupAttributes(2, frames[nextFrame]->GetMeshes()[i]->GetGLObject()->GetAttribBuffer()->GetBuffer());
 			frames[currentFrame]->GetMeshes()[i]->Draw();
@@ -966,6 +976,10 @@ public:
 
 	~AnimatedPhysicsObject()
 	{
+		for (unsigned int i = 0; i < numFrames; i++)
+		{
+			delete frames[i];
+		}
 		delete[] frames;
 		delete factor;
 	}
@@ -975,6 +989,7 @@ public:
 		glUniform1f(glGetUniformLocation(shader->GetProgram(), "animFac"), factor->GetFrame());
 		for (unsigned int i = 0; i < frames[currentFrame]->GetNumMeshes(); i++) //loop over each mesh
 		{
+			//pass in the next frames attributes so the shader can blend between them
 			glBindVertexArray(frames[currentFrame]->GetMeshes()[i]->GetGLObject()->GetObject());
 			frames[currentFrame]->GetMeshes()[i]->GetGLObject()->SetupAttributes(2, frames[nextFrame]->GetMeshes()[i]->GetGLObject()->GetAttribBuffer()->GetBuffer());
 			frames[currentFrame]->GetMeshes()[i]->Draw();
@@ -1110,25 +1125,36 @@ protected:
 	StaticObject* trigger;
 	bool enabled;
 public:
-	Piston(StaticModel* pistonFrame, std::vector<std::string> paths, glm::quat _rot, glm::vec3 _extension, bool initalState)
+	Piston(StaticModel* pistonFrame, std::vector<std::string> paths, glm::quat _rot, glm::vec3 _extension, glm::vec3 iOffset, bool initalState)
 		: AnimatedObject(paths, 2, pistonFrame->Model::LocalToWorldPoint(glm::vec3(-0.164982f, 0.f, 0.f)), _rot, glm::vec3(1.f))
 	{
-		extension = _extension + glm::vec3(0.5f, 0.f, 0.f);
+		extension = _extension + iOffset; //make sure piston still reaches even with the inital offset
 		enabled = initalState;
-		initialPos = pistonFrame->Model::LocalToWorldPoint(glm::vec3(-0.164982f, 0.f, 0.f)) + glm::vec3(0.5f, 0.f, 0.f);
 		if (enabled)
 		{
 			currentFrame = 1;
 			nextFrame = 0;
 		}
-		trigger = new StaticObject(initialPos,
-			_rot, scal, MaterialProperties{ 0.5f, 0.4f, 0.3f, true });
+		initialPos = pistonFrame->Model::LocalToWorldPoint(glm::vec3(-0.164982f, 0.f, 0.f)) + iOffset; //set trigger to spawn in the frame
+
 		glm::vec3 startPos;
 		if (enabled)
+		{
 			startPos = initialPos - extension / 2.f;
+			trigger = new StaticObject(initialPos, glm::quat(1.f, 0.f, 0.f, 0.f), scal + glm::abs(extension)/2.f, MaterialProperties{ 0.5f, 0.4f, 0.3f, true });
+		}
 		else
+		{
 			startPos = initialPos;
+			trigger = new StaticObject(initialPos, glm::quat(1.f, 0.f, 0.f, 0.f), scal, MaterialProperties{ 0.5f, 0.4f, 0.3f, true });
+		}
+		trigger->GetPData()->isPiston = true;
 		trigger->SetPosition(startPos);
+	}
+
+	~Piston()
+	{
+		delete trigger;
 	}
 
 	void Draw(Shader* shader)
@@ -1148,7 +1174,7 @@ public:
 				currentExtension = glm::mix(extension / 2.f, glm::vec3(0.f), factor->GetFrame());
 				newPos = glm::mix(initialPos - currentExtension / 2.f, initialPos + currentExtension / 2.f, factor->GetFrame());
 			}
-			trigger->GetPShape()->setGeometry(PxBoxGeometry(FromGLMVec((scal + currentExtension) / 2.00f)));
+			trigger->GetPShape()->setGeometry(PxBoxGeometry(FromGLMVec((scal + glm::abs(currentExtension)) / 2.00f)));
 			trigger->SetPosition(newPos);
 		}
 		AnimatedObject::Draw(shader);
@@ -1203,13 +1229,18 @@ public:
 		:AnimatedPhysicsObject(playerFrames, 3, _pos, _rot, glm::vec3(1.00f, 1.00f, 1.00f),
 			BoxCollider{ PxVec3(0.00f, 0.50f, 0.00f), PxVec3(0.80f, 1.00f, 0.80f) })
 	{
-		pBody->setRigidDynamicLockFlags(PxRigidDynamicLockFlag::eLOCK_ANGULAR_X | PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z);
+		pBody->setRigidDynamicLockFlags(PxRigidDynamicLockFlag::eLOCK_ANGULAR_X | PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z); //stop unwanted rotation
 		pBody->setName("player");
 	}
 
 	void MoveDir(glm::vec2 dir)
 	{
 		moveDir += dir;
+	}
+
+	void ResetMoveDir()
+	{
+		moveDir = glm::vec2(0.f);
 	}
 
 	void Jump()
@@ -1220,6 +1251,11 @@ public:
 	void Update()
 	{
 		AnimatedPhysicsObject::Update();
+
+		if (pos.y < -2.f) //if we fell off the map
+		{
+			dieFlag = true; //die
+		}
 
 		if (sprinting) //if sprinting
 		{
@@ -1270,7 +1306,7 @@ public:
 			}
 		}
 
-		if (shouldJump)
+		if (shouldJump == true)
 		{
 			if (grounded)
 			{
@@ -1353,6 +1389,7 @@ public:
 	}
 };
 
+//unused
 class Platform
 	: public StaticObject, public AnimatedObject
 {
@@ -1391,6 +1428,7 @@ public:
 	}
 };
 
+//not implemented
 class Light : public Object
 {
 };
@@ -1406,9 +1444,9 @@ public:
 		:Model(*copyModel, position, glm::quat(1.00f, 0.00f, 0.00f, 0.00f), initalScale)
 	{
 		constexpr float lifeTime = 0.67f;
-		Rotate(glm::quat(glm::vec3(SDL_randf() * PI, SDL_randf() * PI, SDL_randf() * PI)));
+		Rotate(glm::quat(glm::vec3(SDL_randf() * PI, SDL_randf() * PI, SDL_randf() * PI))); //give random inital rotation
 		glm::vec3 frames[] = { initalScale, finalScale };
-		anim = new Animation(frames, 2, lifeTime);
+		anim = new Animation(frames, 2, lifeTime); //create animation to smoothly scale the particle
 		anim->Start();
 	}
 
@@ -1466,6 +1504,12 @@ protected:
 		}
 	}
 
+	~DustCloud()
+	{
+		delete copyModel;
+		delete[] particles;
+	}
+
 	void SpawnParticle(glm::vec3 _position)
 	{
 		particlePointer = (particlePointer + 1) % maxParticles; //increment the pointer
@@ -1491,13 +1535,16 @@ protected:
 		PxRigidDynamic* pBody = target->GetPBody();
 		glm::vec3 playerSpeed = FromPxVec(pBody->getLinearVelocity());
 		playerSpeed.y = 0.00f;
+		//if player is moving fast enough on the ground
 		if (glm::length(playerSpeed) >= 4.00f * 0.80f && player->GetGrounded())
 		{
+			//if we last spawned a particle long enough ago to spawn another
 			if (eTime - lastSpawnTime >= minSpawnDelay)
 			{
-				SpawnParticle(target->LocalToWorldPoint(glm::vec3(0.33f, 0.08f, -0.33f))); //change to spawn one at each track
+				//spawn particle at each track
+				SpawnParticle(target->LocalToWorldPoint(glm::vec3(0.33f, 0.08f, -0.33f)));
 				SpawnParticle(target->LocalToWorldPoint(glm::vec3(-0.33f, 0.08f, -0.33f)));
-				lastSpawnTime = eTime;
+				lastSpawnTime = eTime; //reset spawn cooldown
 			}
 		}
 	}
@@ -1530,11 +1577,16 @@ public:
 		shadowBuffer->GetDepth()->Use(2);
 	}
 
+	~Sun()
+	{
+		delete shadowBuffer;
+	}
+
 	glm::mat4 CalculateCombinedMatrix()
 	{
 		const float nearPlane = 0.10f;
 		const float farPlane = 15.00f;
-		glm::mat4 projection = glm::ortho(-10.00f, 10.00f, -10.00f, 10.00f, nearPlane, farPlane);
+		glm::mat4 projection = glm::ortho(-15.00f, 15.00f, -15.00f, 15.00f, nearPlane, farPlane);
 		glm::mat4 view = glm::lookAt(pos, glm::vec3(0.00f), glm::vec3(0.00f, 1.00f, 0.00f));
 		return projection * view;
 	}
@@ -1576,9 +1628,9 @@ public:
 	void Update()
 	{
 		stamina = target->GetStamina();
-		SetPosition(target->LocalToWorldPoint(glm::vec3(0.00f, 0.15f, -0.275f)));
+		SetPosition(target->LocalToWorldPoint(glm::vec3(0.00f, 0.15f, -0.275f))); //put the stamina bar on the player
 		SetRotation(target->GetRotation());
-		glm::vec3 col = glm::mix(glm::vec3(0.8f, 0.0f, 0.0f), glm::vec3(0.0f, 0.8f, 0.0f), stamina);
+		glm::vec3 col = glm::mix(glm::vec3(0.8f, 0.0f, 0.0f), glm::vec3(0.0f, 0.8f, 0.0f), stamina); //set the colour to the stamina remaning
 		meshes[0]->SetColor(col);
 	}
 
@@ -1611,11 +1663,10 @@ protected:
 public:
 	Coin(Model* copyModel, glm::vec3 _pos, unsigned long long int _index)
 		:StaticObject(_pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.20f), MaterialProperties{ 0.5f, 0.4f, 0.3f, true }),
-		Model(*copyModel, _pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.20f))
+		Model(*copyModel, _pos, glm::quat(glm::vec3(glm::radians(60.00f), 0.00f, 0.00f)), glm::vec3(0.20f))
 	{
 		pData.isCoin = true;
 		index = _index;
-		Model::SetRotation(glm::quat(glm::vec3(glm::radians(60.00f), 0.00f, 0.00f)));
 	}
 
 	~Coin()
@@ -1644,7 +1695,7 @@ public:
 		}
 
 		glm::vec3 axis = glm::normalize(glm::rotateX(glm::vec3(0.0f, 1.0f, 0.0f), -glm::radians(60.00f))); //convert local y axis to world y axis
-		Model::SetRotation(glm::rotate(Object::rot, radPerSec * dTime/1000, axis)); //rotate about the global y
+		Model::SetRotation(glm::rotate(Model::rot, radPerSec * dTime/1000, axis)); //rotate about the global y
 	}
 
 	void Draw()
@@ -1691,6 +1742,7 @@ public:
 	{
 		unsigned int playerIndex = 3;
 		unsigned int otherIndex = 3;
+		//this code makes sure we know which actor in the pair is the player and which isn't
 		if (pairHeader.actors[0]->getName() == "player")
 		{
 			playerIndex = 0;
@@ -1724,21 +1776,26 @@ public:
 
 	virtual void onTrigger(PxTriggerPair* pairs, PxU32 count) override
 	{
-		for (PxU32 i = 0; i < count; i++)
+		for (PxU32 i = 0; i < count; i++) //loop over each trigger pair
 		{
-			if (pairs[i].otherActor->getName() == "player")
+			if (pairs[i].otherActor->getName() == "player") //if the collider that entered the trigger is the player
 			{
-				if (pairs[i].triggerActor->userData != nullptr)
+				if (pairs[i].triggerActor->userData != nullptr) //safety
 				{
 					PhysicsData* data = static_cast<PhysicsData*>(pairs[i].triggerActor->userData);
-					if (data->pointer != nullptr && data->isCoin)
+					if (data->pointer != nullptr && data->isCoin) //if its a coin
 					{
 						Coin* coin = static_cast<Coin*>(data->pointer);
-						if (!coin->IsCollected())
+						if (!coin->IsCollected()) //if the coin is not already collected (fixes bug with physX sub stepping)
 						{
 							IncreaseScore(5);
 							coin->Collect();
 						}
+					}
+
+					if (data->isPiston == true) //if we hit a piston
+					{
+						dieFlag = true; //die (this cannot happen here as we cannot modify the physics state in this callback)
 					}
 				}
 			}
@@ -1890,8 +1947,6 @@ int quit(int code)
 		PX_RELEASE(pDispatcher);
 	if (pPhysics != nullptr)
 		PX_RELEASE(pPhysics);
-	if (pPvd != nullptr)
-		PX_RELEASE(pPvd);
 	if (pFoundation != nullptr)
 		PX_RELEASE(pFoundation);
 
@@ -1904,17 +1959,41 @@ void TogglePlatforms()
 	{
 		std::for_each(pistons.begin(), pistons.end(), [&](Piston* piston) { piston->Toggle(); });
 		platformToggle = false;
+		toggleShader->Use();
+		glUniform3fv(glGetUniformLocation(toggleShader->GetProgram(), "colour"), 1, glm::value_ptr(glm::vec3(1.f, 0.f, 0.f)));
 	}
 	else
 	{
 		std::for_each(pistons.begin(), pistons.end(), [&](Piston* piston) { piston->Toggle(); });
 		platformToggle = true;
+		toggleShader->Use();
+		glUniform3fv(glGetUniformLocation(toggleShader->GetProgram(), "colour"), 1, glm::value_ptr(glm::vec3(0.f, 1.f, 0.f)));
 	}
 }
 
 void LoadLevel01()
 {
 	isMainMenu = false;
+	dieFlag = false;
+	delete player;
+	player = new Player(glm::vec3(-9.00f, 1.00f, -4.00f), glm::quat(glm::vec3(0.00f, 90.00f, 0.00f)));
+	player->ResetMoveDir();
+	k_Forward.Reset();
+	k_Left.Reset();
+	k_Backward.Reset();
+	k_Right.Reset();
+	k_Toggle.Reset();
+	k_Jump.Reset();
+	k_Sprint.Reset();
+	platformToggle = false;
+	toggleShader->Use();
+	glUniform3fv(glGetUniformLocation(toggleShader->GetProgram(), "colour"), 1, glm::value_ptr(glm::vec3(1.f, 0.f, 0.f)));
+	delete playerCloud;
+	playerCloud = new DustCloud(player, Path("models/ball.obj"));
+	delete stamBar;
+	stamBar = new StaminaBar(Path("models/stamina_bar.obj"), player);
+	toggleTexture->Use(5);
+
 	Model* copyModel = new Model(Path("models/cube.obj"), glm::vec3(0.0f), glm::quat(glm::vec3(0.0f, glm::radians(45.0f), 0.0f)), glm::vec3(1.0f));
 	groundPlane = new StaticModel(*copyModel, glm::vec3(0.00f, -0.975f, 0.00f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(2.f * 10.f, 1.00f, 2.f * 10.f),
 		MaterialProperties{ 0.5f, 0.4f, 0.3f });
@@ -2077,7 +2156,7 @@ void LoadLevel01()
 	StaticModel* pistonFrame = new StaticModel(*copyModel, glm::vec3(0.501424f, 0.4f, 0.803111f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(1.f),
 		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f)}, MaterialProperties{0.5f, 0.4f, 0.3f});
 	PistonLight* pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, false);
-	Piston* piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(180.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), false);
+	Piston* piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(180.f), 0.f)), glm::vec3(3.6f, 0.f, 0.f), glm::vec3(0.5f, 0.f, 0.f), false);
 	drawModels.push_back(pistonFrame);
 	allocatedColliders.push_back((StaticObject*)pistonFrame);
 	pistonLights.push_back(pistonLight);
@@ -2086,7 +2165,7 @@ void LoadLevel01()
 	pistonFrame = new StaticModel(*copyModel, glm::vec3(-1.86611f, 0.4f, -1.90186f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(1.f),
 		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
 	pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, false);
-	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), false);
+	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(0.f, 0.f, -3.6f), glm::vec3(-0.164982f, 0.f, -0.5f - 0.164982f), false);
 	drawModels.push_back(pistonFrame);
 	allocatedColliders.push_back((StaticObject*)pistonFrame);
 	pistonLights.push_back(pistonLight);
@@ -2094,7 +2173,7 @@ void LoadLevel01()
 	pistonFrame = new StaticModel(*copyModel, glm::vec3(-1.49855f, 0.4f, -7.58753f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(1.f),
 		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
 	pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, false);
-	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), false);
+	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(0.f, 0.f, -3.6f), glm::vec3(-0.164982f, 0.f, -0.5f - 0.164982f), false);
 	drawModels.push_back(pistonFrame);
 	allocatedColliders.push_back((StaticObject*)pistonFrame);
 	pistonLights.push_back(pistonLight);
@@ -2102,7 +2181,7 @@ void LoadLevel01()
 	pistonFrame = new StaticModel(*copyModel, glm::vec3(1.70567f, 0.4f, -7.54987f), glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(1.f),
 		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
 	pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, false);
-	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), false);
+	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(0.f, 0.f, -3.6f), glm::vec3(-0.164982f, 0.f, -0.5f - 0.164982f), false);
 	drawModels.push_back(pistonFrame);
 	allocatedColliders.push_back((StaticObject*)pistonFrame);
 	pistonLights.push_back(pistonLight);
@@ -2110,42 +2189,58 @@ void LoadLevel01()
 	pistonFrame = new StaticModel(*copyModel, glm::vec3(0.f, 0.4f, -4.21222f), glm::quat(glm::vec3(0.f, glm::radians(-90.f), 0.f)), glm::vec3(1.f),
 		BoxCollider{ PxVec3(-0.1f, 0.f, 0.f), PxVec3(0.2f, 1.f, 1.f) }, MaterialProperties{ 0.5f, 0.4f, 0.3f });
 	pistonLight = new PistonLight(*pistonLightCopyModel, pistonFrame, true);
-	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(3.4f, 0.f, 0.f), true);
+	piston = new Piston(pistonFrame, pistonPaths, glm::quat(glm::vec3(0.f, glm::radians(90.f), 0.f)), glm::vec3(0.f, 0.f, 3.6f), glm::vec3(-0.164982f, 0.f, 0.5f + 0.164982f), true);
 	drawModels.push_back(pistonFrame);
 	allocatedColliders.push_back((StaticObject*)pistonFrame);
 	pistonLights.push_back(pistonLight);
 	pistons.push_back(piston);
 	delete copyModel;
 	delete pistonLightCopyModel;
-	
-	/*Platform* platform = new Platform(glm::vec3(1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
-	platform->SetColor(DEFAULT_COLOR);
-	APlatforms.push_back(platform);
-	drawModels.push_back(platform);
-	platform = new Platform(glm::vec3(-1.00f, 0.00f, -1.00f), glm::vec3(1.00f), copyModel);
-	platform->Disable();
-	platform->SetColor(DEFAULT_COLOR);
-	BPlatforms.push_back(platform);
-	drawModels.push_back(platform);
-	delete copyModel;*/
 
 	//place "coins"
-	copyModel = new Model(Path("models/nut.obj"), glm::vec3(1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f));
-	numCoins = 1;
+	Model* nutModel = new Model(Path("models/nut.obj"));
+	Model* boltModel = new Model(Path("models/bolt.obj"));
+
+	numCoins = 50;
 	coins = new Coin* [numCoins];
 	for (unsigned long long int i = 0; i < numCoins; i++)
+	{
 		coins[i] = nullptr;
-	coins[0] = new Coin(copyModel, glm::vec3(glm::vec3(1.0f, 0.15f, 0.0f)), 0);
+	}
+	for (int i = 0; i < numCoins; i++)
+	{
+		float x = SDL_randf() * 20.f - 10.f;
+		float z = SDL_randf() * 20.f - 10.f;
+		Model* coinModel = nutModel;
+		if (i % 2 == 0)
+			coinModel = boltModel;
+		coins[i] = new Coin(coinModel, glm::vec3(x, 0.f, z), i);
+	}
+	delete nutModel;
+	delete boltModel;
 	eTime = SDL_GetTicks();
 }
 
 void UnloadLevel01()
 {
 	//loop over coins
-	//delete each coin
-	//delete coins
-	//delete all pObjects and allocatedColliders
+	for (unsigned int i = 0; i < numCoins; i++)
+	{
+		delete coins[i]; //delete each coin
+	}
+	delete coins;
+	//delete all allocated objects
+	std::for_each(pObjects.begin(), pObjects.end(), [&](PhysicsObject* object) { delete object; });
+	pObjects.clear();
+	std::for_each(allocatedColliders.begin(), allocatedColliders.end(), [&](Object* object) { delete object; });
+	allocatedColliders.clear();
+	std::for_each(pistonLights.begin(), pistonLights.end(), [&](PistonLight* object) { delete object; });
+	pistonLights.clear();
+	std::for_each(pistons.begin(), pistons.end(), [&](Piston* object) { delete object; });
+	pistons.clear();
+	delete groundPlane;
 	//empty drawable objects
+	drawModels.clear();
 }
 
 void IncreaseScore(int amt)

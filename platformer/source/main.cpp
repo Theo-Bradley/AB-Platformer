@@ -14,24 +14,17 @@ Shader* fullScreenShader;
 Texture* mainMenuTexture;
 File* testFile;
 Model* testModel;
-AnimatedObject* animModel;
-DustCloud* playerCloud;
 Sun* sun;
-StaminaBar* stamBar;
 Model* levelTestModel;
+Model* toggle;
 
 int main(int argc, char** argv)
 {
 	bool running = true;
 	init();
 
-	//LoadLevelTest();
 	LoadMainMenu();
-	std::vector <std::string> paths;
-	paths.push_back(Path("models/cube.obj"));
-	paths.push_back(Path("models/cube1.obj"));
 
-	animModel = new AnimatedObject(paths, 2, glm::vec3(0.00f, 1.50f, 0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.00f));
 	levelTestModel = new Model(Path("models/level_01_static.obj"), glm::vec3(0.0f, -0.50f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f));
 
 	eTime = SDL_GetTicks();
@@ -52,6 +45,12 @@ int main(int argc, char** argv)
 		}
 		else
 		{
+			if (dieFlag)
+			{
+				UnloadLevel01();
+				LoadLevel01();
+				continue;
+			}
 			player->SetGrounded(false); //before pContactCallback set player.isGrounded to false (pContactCallback will set it to true if grounded)
 			float fTime = static_cast<float>(dTime + 1) / 1000.00f; //+1 so that fTime is never 0 (crashes physx)
 			pScene->simulate(fTime); //simulate by delta time
@@ -124,11 +123,8 @@ int init()
 	eTime = SDL_GetTicks();
 
 	pFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, pAlloc, pError); //create the "foundation"
-	pPvd = PxCreatePvd(*pFoundation); //create a pvd instance
-	PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10); //set up the pvd transport
-	pPvd->connect(*transport, PxPvdInstrumentationFlag::eALL); //start pvd
 
-	pPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *pFoundation, physx::PxTolerancesScale(), true, pPvd); //create the physics solver
+	pPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *pFoundation, physx::PxTolerancesScale(), true); //create the physics solver
 
 	PxSceneDesc sceneDesc(pPhysics->getTolerancesScale()); //create the scene description
 	sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f); //set gravity to g
@@ -141,6 +137,7 @@ int init()
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
+	//load shaders
 	errorShader = new Shader(true);
 	errorShader->Use();
 	shadowShader = new Shader(Path("shadow.vert"), Path("basic.frag"));
@@ -151,22 +148,26 @@ int init()
 	outlineBufferShader = new Shader(Path("outline_buffer.vert"), Path("outline_buffer.frag"));
 	animatedOutlineBufferShader = new Shader(Path("outline_buffer_animated.vert"), Path("outline_buffer.frag"));
 	fullScreenShader = new Shader(Path("fullscreen.vert"), Path("fullscreen.frag"));
+	toggleShader = new Shader(Path("fullscreen.vert"), Path("toggle.frag"));
 	fullScreenShader->Use();
 	glUniform1i(glGetUniformLocation(fullScreenShader->GetProgram(), "mainMenuTex"), 5);
 	glUniform1i(glGetUniformLocation(fullScreenShader->GetProgram(), "textAtlas"), 6);
+	toggleShader->Use();
+	glUniform1i(glGetUniformLocation(toggleShader->GetProgram(), "tex"), 5);
+	glUniform3fv(glGetUniformLocation(toggleShader->GetProgram(), "colour"), 1, glm::value_ptr(glm::vec3(1.f, 0.f, 0.f)));
+	
 	mainMenuTexture = new Texture(Path("textures/main_menu.png"));
 	mainMenuTexture->Use(5);
+	toggleTexture = new Texture(Path("textures/toggle.png"));
 	mainCamera = new Camera(glm::vec3(0.00f), glm::radians(90.00f));
 	depthBuffer = new GLFramebuffer();
-	depthBuffer->GetColor()->Use(3);
+	depthBuffer->GetColor()->Use(3); //set which texture units to use with the buffer
 	depthBuffer->GetDepth()->Use(4);
 
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); //enable multisampling
 
-	player = new Player(glm::vec3(0.00f, 1.00f, 1.00f), glm::quat(glm::vec3(0.00f, 0.00f, 0.00f)));
-	sun = new Sun(glm::vec3(-5.00f, 4.00f, -1.00f));
-	playerCloud = new DustCloud(player, Path("models/ball.obj"));
-	stamBar = new StaminaBar(Path("models/stamina_bar.obj"), player);
+	sun = new Sun(glm::vec3(-5.00f, 5.00f, -1.00f));
+	toggle = new Model(Path("models/plane.obj"), glm::vec3(0.00f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.1f));
 
 	glClearColor(0.529f, 0.808f, 0.922f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -179,13 +180,14 @@ void Draw()
 	Shader* shader;
 	depthBuffer->Use();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
+	//outline buffer pass (draw worldspace normals and depth buffer)
 	shader = outlineBufferShader;
 	shader->Use();
 	shader->SetUniforms();
-	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); });
+	std::for_each(drawModels.begin(), drawModels.end(), [&](Model* drawModel) { drawModel->Draw(); }); //loop over each element in drawModel and draw it
 	playerCloud->Draw();
 	stamBar->Draw();
-	for (unsigned long long int i = 0; i < numCoins; i++)
+	for (unsigned long long int i = 0; i < numCoins; i++) //loop over each coin and draw it
 	{
 		if (coins[i] != nullptr)
 			coins[i]->Draw();
@@ -196,9 +198,9 @@ void Draw()
 	shader->Use();
 	shader->SetUniforms();
 	player->Draw(shader);
-	animModel->Draw(shader);
 	std::for_each(pistons.begin(), pistons.end(), [&](Piston* pistons) { pistons->Draw(shader); });
 
+	//shadow pass
 	glEnable(GL_MULTISAMPLE);
 	shader = shadowShader;
 	sun->StartShadowPass(shader);
@@ -216,12 +218,12 @@ void Draw()
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	player->Draw(shader);
-	animModel->Draw(shader);
 	std::for_each(pistons.begin(), pistons.end(), [&](Piston* pistons) { pistons->Draw(shader); });
 	sun->EndShadowPass();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear frame buffer
+	//main pass
 	shader = outlineShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
@@ -237,14 +239,19 @@ void Draw()
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	player->Draw(shader);
-	animModel->Draw(shader);
 	std::for_each(pistons.begin(), pistons.end(), [&](Piston* pistons) { pistons->Draw(shader); });
 
+	//draw emissive objects
 	shader = emissiveOutlineShader;
 	shader->Use();
 	shader->SetUniforms(sun->CalculateCombinedMatrix(), sun->GetPosition());
 	stamBar->Draw(shader, outlineShader); //draw the staminaBar as emissive
 	std::for_each(pistonLights.begin(), pistonLights.end(), [&](PistonLight* pistonLight) { pistonLight->Draw(shader, outlineShader); });
+
+	//draw UI
+	toggleShader->Use();
+	toggle->Draw();
+	
 	PrintGLErrors();
 
 	SDL_GL_SwapWindow(window);

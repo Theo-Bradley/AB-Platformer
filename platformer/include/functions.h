@@ -74,7 +74,7 @@ glm::quat FromAssimpQuat(aiQuaternion from)
 	return glm::quat(from.w, from.x, from.y, from.z);
 }
 
-//effectively transposes the aiMatrix4x4 into a glm::mat4
+//effectively transposes the aiMatrix4x4 into a glm::mat4 as one is column major the other is row major
 glm::mat4 FromAssimpMat(aiMatrix4x4 _mat)
 {
 	glm::mat4 result = glm::mat4(0.0f);
@@ -97,7 +97,7 @@ glm::mat4 FromAssimpMat(aiMatrix4x4 _mat)
 	return result;
 }
 
-//effectively transposes the glm::mat4 into an aiMatrix4x4
+//effectively transposes the glm::mat4 into an aiMatrix4x4 as one is column major the other is row major
 aiMatrix4x4 FromGLMMat(glm::mat4 _mat)
 {
 	aiMatrix4x4 result = aiMatrix4x4();
@@ -143,6 +143,7 @@ void IncreaseScore(int amt);
 
 void UnloadMainMenu();
 void LoadLevel01();
+void UnloadLevel01();
 
 class PhysicsModel;
 PhysicsModel* LoadPhysicsModel(Model& copyModel, glm::vec3 _pos, glm::quat _rot, glm::vec3 _scal, const char* colliderPath, glm::vec3 colliderOffset);
